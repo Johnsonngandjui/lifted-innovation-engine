@@ -1,3 +1,4 @@
+// components/AIEvaluation.js - Modified version of the AIEvaluation component
 import React, { useState } from 'react';
 import {
   Box,
@@ -18,20 +19,28 @@ import {
   Chip,
   LinearProgress,
   IconButton,
-  Tooltip
+  Tooltip,
+  useTheme
 } from '@mui/material';
+
+// Icons
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import { aiEvaluationQuestions, aiEvaluationCriteria } from '../data/mockData';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import RecommendIcon from '@mui/icons-material/Recommend';
 
 const AIEvaluation = () => {
+  const theme = useTheme();
+  
   const [ideaText, setIdeaText] = useState('');
   const [evaluating, setEvaluating] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [evaluationResults, setEvaluationResults] = useState(null);
   const [enhancedIdea, setEnhancedIdea] = useState('');
   const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState([]);
+  const [tags, setTags] = useState(['Innovation', 'AI', 'Automation']);
   
   const steps = ['Enter Your Idea', 'AI Enhancement', 'Evaluation Results'];
   
@@ -47,13 +56,13 @@ const AIEvaluation = () => {
     setEvaluating(true);
     
     // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Mock AI enhancement
     const enhanced = ideaText + "\n\nEnhanced context: This idea could be implemented using our existing data infrastructure with minimal additional resources. It aligns with our Q3 objective of improving operational efficiency and could potentially reduce manual processing time by 40%.";
     setEnhancedIdea(enhanced);
     
-    // Add some default tags if none exist
+    // Add default tags if none exist
     if (tags.length === 0) {
       setTags(['Efficiency', 'Process Improvement', 'Innovation']);
     }
@@ -145,7 +154,7 @@ const AIEvaluation = () => {
     setIdeaText('');
     setEnhancedIdea('');
     setEvaluationResults(null);
-    setTags([]);
+    setTags(['Innovation', 'AI', 'Automation']);
     setActiveStep(0);
   };
   
@@ -172,6 +181,7 @@ const AIEvaluation = () => {
                 color="primary"
                 disabled={ideaText.trim().length < 20 || evaluating}
                 onClick={handleEvaluate}
+                startIcon={evaluating ? undefined : <AutoAwesomeIcon />}
                 sx={{ minWidth: 150 }}
               >
                 {evaluating ? <CircularProgress size={24} /> : "AI Enhance"}
@@ -235,22 +245,57 @@ const AIEvaluation = () => {
             
             <Box sx={{ mt: 3 }}>
               <Typography variant="subtitle1" gutterBottom>
-                AI Evaluation Questions
+                AI Evaluation Process
               </Typography>
               <Grid container spacing={2}>
-                {aiEvaluationQuestions.map((question, index) => (
-                  <Grid item xs={12} md={6} key={index}>
-                    <Card variant="outlined" sx={{ height: '100%' }}>
-                      <CardContent>
-                        <Typography variant="body2">
-                          {question}
+                <Grid item xs={12} md={4}>
+                  <Card variant="outlined" sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <LightbulbIcon sx={{ color: theme.palette.warning.main, mr: 1 }} />
+                        <Typography variant="subtitle2">
+                          Idea Analysis
                         </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
+                      </Box>
+                      <Typography variant="body2">
+                        The AI analyzes the core concept, innovation potential, and uniqueness
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card variant="outlined" sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <AssessmentIcon sx={{ color: theme.palette.primary.main, mr: 1 }} />
+                        <Typography variant="subtitle2">
+                          Scoring & Metrics
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2">
+                        Evaluation across feasibility, impact, alignment, and scalability
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Card variant="outlined" sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <RecommendIcon sx={{ color: theme.palette.success.main, mr: 1 }} />
+                        <Typography variant="subtitle2">
+                          Recommendations
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2">
+                        Actionable suggestions for implementation and refinement
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
               </Grid>
             </Box>
+            
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
               <Button
                 variant="outlined"
@@ -264,6 +309,7 @@ const AIEvaluation = () => {
                 color="primary"
                 disabled={enhancedIdea.trim().length < 20 || evaluating}
                 onClick={handleRunEvaluation}
+                startIcon={evaluating ? undefined : <AssessmentIcon />}
                 sx={{ minWidth: 150 }}
               >
                 {evaluating ? <CircularProgress size={24} /> : "Run Evaluation"}
@@ -279,23 +325,19 @@ const AIEvaluation = () => {
               <>
                 <Grid container spacing={3}>
                   <Grid item xs={12}>
-                    <Card sx={{ mb: 3 }}>
+                    <Card sx={{ mb: 3, bgcolor: theme.palette.primary.light, color: 'white' }}>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>
                           Overall Evaluation Score
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Box sx={{ position: 'relative', display: 'inline-flex', mr: 2 }}>
+                          <Box sx={{ position: 'relative', display: 'inline-flex', mr: 3 }}>
                             <CircularProgress
                               variant="determinate"
                               value={evaluationResults.overallScore}
                               size={80}
-                              thickness={4}
-                              sx={{ color: 
-                                evaluationResults.overallScore >= 90 ? 'success.main' :
-                                evaluationResults.overallScore >= 70 ? 'primary.main' :
-                                'warning.main'
-                              }}
+                              thickness={5}
+                              sx={{ color: 'white' }}
                             />
                             <Box
                               sx={{
@@ -309,17 +351,23 @@ const AIEvaluation = () => {
                                 justifyContent: 'center',
                               }}
                             >
-                              <Typography variant="h6" component="div">
-                                {evaluationResults.overallScore}%
+                              <Typography variant="h4" fontWeight="bold" color="white">
+                                {evaluationResults.overallScore}
                               </Typography>
                             </Box>
                           </Box>
                           <Box sx={{ flexGrow: 1 }}>
+                            <Typography variant="h6" fontWeight="bold">
+                              {evaluationResults.overallScore >= 90 ? 'Excellent Idea' :
+                               evaluationResults.overallScore >= 80 ? 'Strong Idea' :
+                               evaluationResults.overallScore >= 70 ? 'Good Idea' :
+                               'Average Idea'}
+                            </Typography>
                             <Typography variant="body1">
-                              {evaluationResults.overallScore >= 90 ? 'Excellent Idea - Highly recommended for implementation' :
-                               evaluationResults.overallScore >= 80 ? 'Strong Idea - Recommended for implementation' :
-                               evaluationResults.overallScore >= 70 ? 'Good Idea - Consider implementation with refinements' :
-                               'Average Idea - Needs significant refinement'}
+                              {evaluationResults.overallScore >= 90 ? 'Highly recommended for implementation' :
+                               evaluationResults.overallScore >= 80 ? 'Recommended for implementation' :
+                               evaluationResults.overallScore >= 70 ? 'Consider implementation with refinements' :
+                               'Needs significant refinement'}
                             </Typography>
                           </Box>
                         </Box>
@@ -332,16 +380,19 @@ const AIEvaluation = () => {
                       Evaluation Criteria
                     </Typography>
                     <Grid container spacing={2}>
-                      {aiEvaluationCriteria.map((criteria, index) => {
-                        const criteriaName = criteria.name.toLowerCase();
-                        const score = evaluationResults.scores[criteriaName] || 0;
+                      {Object.entries(evaluationResults.scores).map(([criteriaKey, score]) => {
+                        // Skip the overall score
+                        if (criteriaKey === 'overallScore') return null;
+                        
+                        // Format the criteria name
+                        const criteriaName = criteriaKey.charAt(0).toUpperCase() + criteriaKey.slice(1);
                         
                         return (
-                          <Grid item xs={12} md={6} lg={4} key={index}>
+                          <Grid item xs={12} md={6} lg={4} key={criteriaKey}>
                             <Card sx={{ height: '100%' }}>
                               <CardContent>
                                 <Typography variant="subtitle1" gutterBottom>
-                                  {criteria.name}
+                                  {criteriaName}
                                 </Typography>
                                 <LinearProgress 
                                   variant="determinate" 
@@ -349,8 +400,12 @@ const AIEvaluation = () => {
                                   sx={{ height: 8, borderRadius: 2, mb: 1 }}
                                 />
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <Typography variant="body2" color="textSecondary">
-                                    {criteria.description}
+                                  <Typography variant="body2" color="text.secondary">
+                                    {criteriaName === 'Feasibility' ? 'Implementation difficulty' :
+                                     criteriaName === 'Impact' ? 'Business value' :
+                                     criteriaName === 'Alignment' ? 'Strategic fit' :
+                                     criteriaName === 'Innovation' ? 'Novelty' :
+                                     'Growth potential'}
                                   </Typography>
                                   <Typography variant="body2" fontWeight="bold">
                                     {score}%
@@ -422,7 +477,7 @@ const AIEvaluation = () => {
                         <Grid container spacing={1} sx={{ mb: 2 }}>
                           <Grid item xs={12} sm={6}>
                             <Paper variant="outlined" sx={{ p: 1 }}>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Development
                               </Typography>
                               <Typography variant="body1">
@@ -432,7 +487,7 @@ const AIEvaluation = () => {
                           </Grid>
                           <Grid item xs={12} sm={6}>
                             <Paper variant="outlined" sx={{ p: 1 }}>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Implementation
                               </Typography>
                               <Typography variant="body1">
@@ -442,7 +497,7 @@ const AIEvaluation = () => {
                           </Grid>
                           <Grid item xs={12} sm={6}>
                             <Paper variant="outlined" sx={{ p: 1 }}>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Maintenance
                               </Typography>
                               <Typography variant="body1">
@@ -452,7 +507,7 @@ const AIEvaluation = () => {
                           </Grid>
                           <Grid item xs={12} sm={6}>
                             <Paper variant="outlined" sx={{ p: 1 }}>
-                              <Typography variant="body2" color="textSecondary">
+                              <Typography variant="body2" color="text.secondary">
                                 Total Cost
                               </Typography>
                               <Typography variant="body1" fontWeight="bold">
@@ -515,14 +570,21 @@ const AIEvaluation = () => {
   
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" fontWeight="bold" gutterBottom>
         AI Idea Evaluation
       </Typography>
       <Typography variant="body1" paragraph>
         Our AI system will help you refine and evaluate your innovation idea based on feasibility, impact, and alignment with company goals.
       </Typography>
       
-      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+      <Stepper 
+        activeStep={activeStep} 
+        sx={{ 
+          mb: 4,
+          '& .MuiStepLabel-iconContainer .Mui-active': { color: 'primary.main' },
+          '& .MuiStepLabel-iconContainer .Mui-completed': { color: 'success.main' },
+        }}
+      >
         {steps.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>
