@@ -16,8 +16,12 @@ import {
   Divider,
   Rating,
   Chip,
-  LinearProgress
+  LinearProgress,
+  IconButton,
+  Tooltip
 } from '@mui/material';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { aiEvaluationQuestions, aiEvaluationCriteria } from '../data/mockData';
 
 const AIEvaluation = () => {
@@ -26,6 +30,8 @@ const AIEvaluation = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [evaluationResults, setEvaluationResults] = useState(null);
   const [enhancedIdea, setEnhancedIdea] = useState('');
+  const [tagInput, setTagInput] = useState('');
+  const [tags, setTags] = useState([]);
   
   const steps = ['Enter Your Idea', 'AI Enhancement', 'Evaluation Results'];
   
@@ -47,8 +53,35 @@ const AIEvaluation = () => {
     const enhanced = ideaText + "\n\nEnhanced context: This idea could be implemented using our existing data infrastructure with minimal additional resources. It aligns with our Q3 objective of improving operational efficiency and could potentially reduce manual processing time by 40%.";
     setEnhancedIdea(enhanced);
     
+    // Add some default tags if none exist
+    if (tags.length === 0) {
+      setTags(['Efficiency', 'Process Improvement', 'Innovation']);
+    }
+    
     setEvaluating(false);
     setActiveStep(1);
+  };
+  
+  const handleTagInputChange = (e) => {
+    setTagInput(e.target.value);
+  };
+
+  const handleTagKeyDown = (e) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      addTag();
+    }
+  };
+
+  const addTag = () => {
+    if (tagInput.trim()) {
+      setTags([...tags, tagInput.trim()]);
+      setTagInput('');
+    }
+  };
+
+  const handleDeleteTag = (tagToDelete) => {
+    setTags(tags.filter(tag => tag !== tagToDelete));
   };
   
   const handleRunEvaluation = async () => {
@@ -112,6 +145,7 @@ const AIEvaluation = () => {
     setIdeaText('');
     setEnhancedIdea('');
     setEvaluationResults(null);
+    setTags([]);
     setActiveStep(0);
   };
   
@@ -159,6 +193,46 @@ const AIEvaluation = () => {
               value={enhancedIdea}
               onChange={handleEnhancedIdeaChange}
             />
+            
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle1" gutterBottom display="flex" alignItems="center">
+                Tags
+                <Tooltip title="Keywords that help categorize your idea">
+                  <IconButton size="small">
+                    <HelpOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <TextField
+                  label="Add Tag"
+                  value={tagInput}
+                  onChange={handleTagInputChange}
+                  onKeyDown={handleTagKeyDown}
+                  size="small"
+                  sx={{ mr: 1 }}
+                />
+                <Button 
+                  variant="outlined" 
+                  startIcon={<AddCircleOutlineIcon />}
+                  onClick={addTag}
+                >
+                  Add
+                </Button>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                {tags.map((tag) => (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    onDelete={() => handleDeleteTag(tag)}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))}
+              </Box>
+            </Box>
+            
             <Box sx={{ mt: 3 }}>
               <Typography variant="subtitle1" gutterBottom>
                 AI Evaluation Questions

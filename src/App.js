@@ -13,11 +13,14 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import AddIcon from '@mui/icons-material/Add';
+import ViewListIcon from '@mui/icons-material/ViewList';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Link } from 'react-router-dom';
 
 import Dashboard from './components/Dashboard';
+import Settings from './components/Settings';
 import IdeaForm from './components/IdeaForm';
 import IdeaList from './components/IdeaList';
 import AIEvaluation from './components/AIEvaluation';
@@ -31,11 +34,13 @@ const theme = createTheme({
       main: '#00539b', // Liberty Mutual blue
       light: '#2179cf',
       dark: '#003b6f',
+      contrastText: '#ffffff',
     },
     secondary: {
       main: '#ffd200', // Liberty Mutual yellow
       light: '#ffdb4d',
       dark: '#d9b300',
+      contrastText: '#000000',
     },
     background: {
       default: '#f7f7f7',
@@ -87,6 +92,13 @@ const theme = createTheme({
         },
       },
     },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          fontWeight: 500,
+        },
+      },
+    },
   },
 });
 
@@ -99,7 +111,6 @@ function App() {
           <Box sx={{ display: 'flex' }}>
             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
               <Toolbar>
-                <LightbulbIcon sx={{ mr: 2 }} />
                 <Typography variant="h6" noWrap component="div">
                   LIFTED Innovation Engine
                 </Typography>
@@ -124,13 +135,13 @@ function App() {
                   </ListItem>
                   <ListItem button component={Link} to="/ideas">
                     <ListItemIcon>
-                      <LightbulbIcon />
+                      <ViewListIcon /> {/* Changed from LightbulbIcon to ViewListIcon */}
                     </ListItemIcon>
                     <ListItemText primary="Ideas" />
                   </ListItem>
                   <ListItem button component={Link} to="/submit">
                     <ListItemIcon>
-                      <LightbulbIcon color="action" />
+                      <AddIcon /> {/* Changed from LightbulbIcon color="action" to AddIcon */}
                     </ListItemIcon>
                     <ListItemText primary="Submit Idea" />
                   </ListItem>
@@ -156,7 +167,7 @@ function App() {
                 <Route path="/ideas" element={<IdeaList />} />
                 <Route path="/submit" element={<IdeaForm />} />
                 <Route path="/evaluation" element={<AIEvaluation />} />
-                <Route path="/settings" element={<p>Settings page (coming soon)</p>} />
+                <Route path="/settings" element={<Settings />}/>
               </Routes>
             </Box>
           </Box>
