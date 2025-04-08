@@ -144,6 +144,8 @@ export const mockIdeas = [
   ];
   
   export const statusOptions = [
+    "Draft",      
+    "Created",    
     "Submitted",
     "Under Review",
     "Evaluation",

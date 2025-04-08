@@ -25,7 +25,7 @@ export const AppProvider = ({ children }) => {
       ...idea,
       id: ideas.length + 1,
       dateSubmitted: new Date().toISOString().slice(0, 10),
-      status: 'Submitted',
+      status: idea.status || 'Created',
       progress: 0,
       comments: [],
       jiraTickets: [],

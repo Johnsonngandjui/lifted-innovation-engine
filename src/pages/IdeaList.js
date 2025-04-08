@@ -68,7 +68,7 @@ import ForwardIcon from '@mui/icons-material/Forward';
 const IdeaList = () => {
   const { ideas, loading, statusOptions, departments, evaluateIdea } = useContext(AppContext);
   const theme = useTheme();
-  
+
   // Filter and sort states
   const [filters, setFilters] = useState({
     status: '',
@@ -79,39 +79,39 @@ const IdeaList = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
   const [bookmarkedIdeas, setBookmarkedIdeas] = useState([]);
-  
+
   // Filter menu state
   const [sortAnchorEl, setSortAnchorEl] = useState(null);
-  
+
   // AI Evaluation dialog states
   const [evaluationOpen, setEvaluationOpen] = useState(false);
   const [selectedIdea, setSelectedIdea] = useState(null);
-  
+
   // Handle filter changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters({ ...filters, [name]: value });
   };
-  
+
   // Handle sort menu
   const handleSortClick = (event) => {
     setSortAnchorEl(event.currentTarget);
   };
-  
+
   const handleSortClose = () => {
     setSortAnchorEl(null);
   };
-  
+
   const handleSortChange = (sort) => {
     setSortBy(sort);
     handleSortClose();
   };
-  
+
   // Handle tab change
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
   };
-  
+
   // Toggle bookmark
   const toggleBookmark = (ideaId) => {
     if (bookmarkedIdeas.includes(ideaId)) {
@@ -120,13 +120,13 @@ const IdeaList = () => {
       setBookmarkedIdeas([...bookmarkedIdeas, ideaId]);
     }
   };
-  
+
   // Open idea evaluation
   const handleOpenEvaluation = (idea) => {
     setSelectedIdea(idea);
     setEvaluationOpen(true);
   };
-  
+
   // Clear all filters
   const clearFilters = () => {
     setFilters({
@@ -135,30 +135,30 @@ const IdeaList = () => {
       search: '',
     });
   };
-  
+
   // Status tabs mapping
-  const tabStatuses = ['All', 'Submitted', 'In Progress', 'Approved', 'Completed'];
-  
+  const tabStatuses = ['All', 'Draft', 'Submitted', 'In Progress', 'Approved', 'Completed'];
+
   // Filter and sort ideas
   const filteredIdeas = useMemo(() => {
     // Start with all ideas
     let result = [...ideas];
-    
+
     // Tab filter (status)
     if (currentTab > 0) {
       result = result.filter(idea => idea.status === tabStatuses[currentTab]);
     }
-    
+
     // Status filter (if not already filtered by tab)
     if (filters.status && (currentTab === 0)) {
       result = result.filter(idea => idea.status === filters.status);
     }
-    
+
     // Department filter
     if (filters.department) {
       result = result.filter(idea => idea.department === filters.department);
     }
-    
+
     // Search filter
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
@@ -168,7 +168,7 @@ const IdeaList = () => {
         idea.tags.some(tag => tag.toLowerCase().includes(searchLower))
       );
     }
-    
+
     // Sort
     const [sortField, sortDirection] = sortBy.split('_');
     result = result.sort((a, b) => {
@@ -179,27 +179,27 @@ const IdeaList = () => {
         const scoreB = b.aiScore?.overall || 0;
         return sortDirection === 'asc' ? scoreA - scoreB : scoreB - scoreA;
       }
-      
+
       // Normal string/date sorting
       if (a[sortField] < b[sortField]) return sortDirection === 'asc' ? -1 : 1;
       if (a[sortField] > b[sortField]) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-    
+
     return result;
   }, [ideas, filters, sortBy, currentTab]);
-  
+
   // Filter bookmarked ideas
   const bookmarkedFilteredIdeas = useMemo(() => {
     return filteredIdeas.filter(idea => bookmarkedIdeas.includes(idea.id));
   }, [filteredIdeas, bookmarkedIdeas]);
-  
+
   // Display ideas based on current view
   const displayedIdeas = currentTab === 5 ? bookmarkedFilteredIdeas : filteredIdeas;
-  
+
   // Helper to get color for status
   const getStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case 'Completed': return 'success';
       case 'In Progress': return 'primary';
       case 'Approved': return 'info';
@@ -209,10 +209,10 @@ const IdeaList = () => {
       default: return 'default';
     }
   };
-  
+
   // Get status icon
   const getStatusIcon = (status) => {
-    switch(status) {
+    switch (status) {
       case 'Completed': return <CheckCircleOutlineIcon fontSize="small" />;
       case 'In Progress': return <PlayArrowIcon fontSize="small" />;
       case 'Approved': return <CheckCircleIcon fontSize="small" />;
@@ -223,14 +223,14 @@ const IdeaList = () => {
       default: return <AccessTimeIcon fontSize="small" />;
     }
   };
-  
+
   // Render idea card
   const renderIdeaCard = (idea) => {
     const isBookmarked = bookmarkedIdeas.includes(idea.id);
-    
+
     return (
-      <Card 
-        sx={{ 
+      <Card
+        sx={{
           mb: 3,
           position: 'relative',
           transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
@@ -241,18 +241,18 @@ const IdeaList = () => {
         }}
         key={idea.id}
       >
-        <Box 
-          sx={{ 
-            position: 'absolute', 
-            top: 16, 
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 16,
             right: 16,
             zIndex: 1
           }}
         >
-          <IconButton 
-            size="small" 
+          <IconButton
+            size="small"
             onClick={() => toggleBookmark(idea.id)}
-            sx={{ 
+            sx={{
               color: isBookmarked ? 'warning.main' : 'grey.400',
               '&:hover': {
                 color: isBookmarked ? 'warning.main' : 'grey.600',
@@ -262,7 +262,7 @@ const IdeaList = () => {
             {isBookmarked ? <BookmarkIcon /> : <BookmarkBorderIcon />}
           </IconButton>
         </Box>
-        
+
         <CardContent sx={{ p: 3 }}>
           <Grid container spacing={2}>
             <Grid item xs={12}>
@@ -278,13 +278,13 @@ const IdeaList = () => {
                   sx={{ ml: 1 }}
                 />
               </Box>
-              
+
               <Typography variant="body2" color="text.secondary" paragraph>
                 {idea.description.length > 200
                   ? `${idea.description.substring(0, 200)}...`
                   : idea.description}
               </Typography>
-              
+
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
                 {idea.tags.map((tag) => (
                   <Chip
@@ -297,17 +297,17 @@ const IdeaList = () => {
                 ))}
               </Box>
             </Grid>
-            
+
             <Grid item xs={12}>
               <Divider />
             </Grid>
-            
+
             <Grid item xs={12} sm={6} md={4}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Avatar 
-                  sx={{ 
-                    width: 28, 
-                    height: 28, 
+                <Avatar
+                  sx={{
+                    width: 28,
+                    height: 28,
                     bgcolor: theme.palette.primary.main,
                     fontSize: '0.9rem',
                     mr: 1
@@ -325,7 +325,7 @@ const IdeaList = () => {
                 </Box>
               </Box>
             </Grid>
-            
+
             <Grid item xs={12} sm={6} md={4}>
               <Typography variant="body2" color="text.secondary">
                 Submitted on
@@ -334,7 +334,7 @@ const IdeaList = () => {
                 {idea.dateSubmitted}
               </Typography>
             </Grid>
-            
+
             {idea.aiScore && idea.aiScore.overall > 0 && (
               <Grid item xs={12} sm={6} md={4}>
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -344,11 +344,11 @@ const IdeaList = () => {
                       value={idea.aiScore.overall}
                       size={36}
                       thickness={4}
-                      sx={{ 
-                        color: 
+                      sx={{
+                        color:
                           idea.aiScore.overall >= 85 ? 'success.main' :
-                          idea.aiScore.overall >= 70 ? 'primary.main' :
-                          'warning.main'
+                            idea.aiScore.overall >= 70 ? 'primary.main' :
+                              'warning.main'
                       }}
                     />
                     <Box
@@ -379,7 +379,7 @@ const IdeaList = () => {
                 </Box>
               </Grid>
             )}
-            
+
             {idea.progress > 0 && (
               <Grid item xs={12}>
                 <Box sx={{ mb: 0, mt: 1 }}>
@@ -387,15 +387,15 @@ const IdeaList = () => {
                     <Typography variant="body2" fontWeight="medium">Progress</Typography>
                     <Typography variant="body2" color="text.secondary">{idea.progress}%</Typography>
                   </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={idea.progress} 
+                  <LinearProgress
+                    variant="determinate"
+                    value={idea.progress}
                     sx={{ height: 6, borderRadius: 5 }}
                   />
                 </Box>
               </Grid>
             )}
-            
+
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
                 {idea.status === 'Submitted' && (
@@ -409,11 +409,13 @@ const IdeaList = () => {
                     Evaluate
                   </Button>
                 )}
-                
+
                 <Button
                   variant="outlined"
                   size="small"
                   startIcon={<ForwardIcon />}
+                  component={Link}
+                  to={`/ideas/${idea.id}`}
                 >
                   View Details
                 </Button>
@@ -450,13 +452,13 @@ const IdeaList = () => {
           color="primary"
           startIcon={<AddIcon />}
           component={Link}
-          to="/submit"
+          to="/create"
           sx={{ px: 3, py: 1.2, boxShadow: '0 4px 14px rgba(0, 87, 184, 0.25)' }}
         >
-          New Idea
+          Create Idea
         </Button>
       </Box>
-      
+
       {/* Filters and Search */}
       <Paper sx={{ mb: 3, p: 2, borderRadius: 2 }}>
         <Grid container spacing={2} alignItems="center">
@@ -473,7 +475,7 @@ const IdeaList = () => {
               size="small"
             />
           </Grid>
-          
+
           <Grid item xs={12} sm={6} md={2}>
             <Button
               fullWidth
@@ -486,7 +488,7 @@ const IdeaList = () => {
               Filters
             </Button>
           </Grid>
-          
+
           <Grid item xs={12} sm={6} md={3}>
             <Button
               fullWidth
@@ -496,9 +498,9 @@ const IdeaList = () => {
               size="medium"
               sx={{ height: 40 }}
             >
-              {sortBy.includes('title') ? 'Title' : 
-               sortBy.includes('dateSubmitted') ? 'Date' : 
-               sortBy.includes('score') ? 'AI Score' : 'Sort By'}
+              {sortBy.includes('title') ? 'Title' :
+                sortBy.includes('dateSubmitted') ? 'Date' :
+                  sortBy.includes('score') ? 'AI Score' : 'Sort By'}
               {sortBy.includes('asc') ? ' (A-Z)' : ' (Z-A)'}
             </Button>
             <Menu
@@ -538,7 +540,7 @@ const IdeaList = () => {
               </MenuItem>
             </Menu>
           </Grid>
-          
+
           <Grid item xs={12} sm={6} md={3}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               {(filters.status || filters.department || filters.search) && (
@@ -551,11 +553,11 @@ const IdeaList = () => {
                   Clear Filters
                 </Button>
               )}
-              <Badge 
-                color="primary" 
+              <Badge
+                color="primary"
                 badgeContent={
-                  (filters.status ? 1 : 0) + 
-                  (filters.department ? 1 : 0) + 
+                  (filters.status ? 1 : 0) +
+                  (filters.department ? 1 : 0) +
                   (filters.search ? 1 : 0)
                 }
                 sx={{ mr: 1 }}
@@ -567,13 +569,13 @@ const IdeaList = () => {
               </Typography>
             </Box>
           </Grid>
-          
+
           {showFilters && (
             <>
               <Grid item xs={12}>
                 <Divider sx={{ my: 1 }} />
               </Grid>
-              
+
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth size="small">
                   <InputLabel id="status-filter-label">Status</InputLabel>
@@ -593,7 +595,7 @@ const IdeaList = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              
+
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth size="small">
                   <InputLabel id="department-filter-label">Department</InputLabel>
@@ -617,11 +619,11 @@ const IdeaList = () => {
           )}
         </Grid>
       </Paper>
-      
+
       {/* Idea Status Tabs */}
       <Box sx={{ mb: 3 }}>
-        <Tabs 
-          value={currentTab} 
+        <Tabs
+          value={currentTab}
           onChange={handleTabChange}
           variant="scrollable"
           scrollButtons="auto"
@@ -637,6 +639,11 @@ const IdeaList = () => {
           }}
         >
           <Tab label="All Ideas" />
+          <Tab label={
+            <Badge badgeContent={ideas.filter(i => i.status === 'Draft').length} color="default">
+              Draft
+            </Badge>
+          } />
           <Tab label={
             <Badge badgeContent={ideas.filter(i => i.status === 'Submitted').length} color="primary">
               Submitted
@@ -657,42 +664,42 @@ const IdeaList = () => {
               Completed
             </Badge>
           } />
-          <Tab 
+          <Tab
             label={
               <Badge badgeContent={bookmarkedIdeas.length} color="warning">
                 Bookmarked
               </Badge>
-            } 
+            }
             icon={<BookmarkIcon sx={{ fontSize: '1.2rem' }} />}
             iconPosition="start"
           />
         </Tabs>
       </Box>
-      
+
       {/* Ideas List */}
       {displayedIdeas.length === 0 ? (
-        <Box 
-          sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             justifyContent: 'center',
-            py: 10 
+            py: 10
           }}
         >
-          <LightbulbIcon 
-            sx={{ 
-              fontSize: 72, 
+          <LightbulbIcon
+            sx={{
+              fontSize: 72,
               color: theme.palette.grey[300],
               mb: 3
-            }} 
+            }}
           />
           <Typography variant="h6" color="text.secondary" gutterBottom>
             No ideas found
           </Typography>
           <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 3, maxWidth: 400 }}>
-            {currentTab === 5 
-              ? "You haven't bookmarked any ideas yet." 
+            {currentTab === 5
+              ? "You haven't bookmarked any ideas yet."
               : "There are no ideas matching your current filters."}
           </Typography>
           {filters.status || filters.department || filters.search ? (
@@ -719,7 +726,7 @@ const IdeaList = () => {
           {displayedIdeas.map(renderIdeaCard)}
         </Box>
       )}
-      
+
       {/* AI Evaluation Dialog */}
       {selectedIdea && (
         <AIEvaluationDialog
@@ -738,16 +745,16 @@ const AIEvaluationDialog = ({ open, onClose, idea, onEvaluate }) => {
   const theme = useTheme();
   const [evaluating, setEvaluating] = useState(false);
   const [evaluationComplete, setEvaluationComplete] = useState(false);
-  
+
   const handleStartEvaluation = async () => {
     setEvaluating(true);
-    
+
     // Simulate evaluation delay
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Call the evaluation function
     onEvaluate(idea.id);
-    
+
     setEvaluating(false);
     setEvaluationComplete(true);
   };
@@ -771,9 +778,9 @@ const AIEvaluationDialog = ({ open, onClose, idea, onEvaluate }) => {
           )}
         </Box>
       </DialogTitle>
-      
+
       <Divider />
-      
+
       <DialogContent>
         {evaluating ? (
           <Box sx={{ textAlign: 'center', py: 6 }}>
@@ -790,45 +797,45 @@ const AIEvaluationDialog = ({ open, onClose, idea, onEvaluate }) => {
             <Alert severity="success" sx={{ mb: 3 }}>
               AI evaluation complete!
             </Alert>
-            
+
             <Typography variant="subtitle1" gutterBottom>
               Evaluation Results
             </Typography>
-            
+
             <Grid container spacing={2}>
               <Grid item xs={12} md={4}>
                 <Typography variant="body2">Feasibility</Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={85} 
+                <LinearProgress
+                  variant="determinate"
+                  value={85}
                   sx={{ height: 8, borderRadius: 2 }}
                 />
                 <Typography variant="body2" align="right">85%</Typography>
               </Grid>
-              
+
               <Grid item xs={12} md={4}>
                 <Typography variant="body2">Impact</Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={92} 
+                <LinearProgress
+                  variant="determinate"
+                  value={92}
                   color="secondary"
                   sx={{ height: 8, borderRadius: 2 }}
                 />
                 <Typography variant="body2" align="right">92%</Typography>
               </Grid>
-              
+
               <Grid item xs={12} md={4}>
                 <Typography variant="body2">Alignment</Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={78} 
+                <LinearProgress
+                  variant="determinate"
+                  value={78}
                   color="success"
                   sx={{ height: 8, borderRadius: 2 }}
                 />
                 <Typography variant="body2" align="right">78%</Typography>
               </Grid>
             </Grid>
-            
+
             <Box sx={{ mt: 3 }}>
               <Typography variant="subtitle1" gutterBottom>
                 AI Recommendations
@@ -859,7 +866,7 @@ const AIEvaluationDialog = ({ open, onClose, idea, onEvaluate }) => {
           </Box>
         )}
       </DialogContent>
-      
+
       <DialogActions>
         {!evaluationComplete ? (
           <>
@@ -867,7 +874,7 @@ const AIEvaluationDialog = ({ open, onClose, idea, onEvaluate }) => {
               Cancel
             </Button>
             {!evaluating && (
-              <Button 
+              <Button
                 variant="contained"
                 onClick={handleStartEvaluation}
                 disabled={evaluating}
@@ -877,7 +884,7 @@ const AIEvaluationDialog = ({ open, onClose, idea, onEvaluate }) => {
             )}
           </>
         ) : (
-          <Button 
+          <Button
             variant="contained"
             onClick={onClose}
           >

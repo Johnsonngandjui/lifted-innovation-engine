@@ -37,6 +37,8 @@ import IdeaList from './pages/IdeaList';
 import IdeaForm from './pages/IdeaForm';
 import AIEvaluation from './components/AIEvaluation';
 import Settings from './pages/Settings';
+import IdeaDetail from './pages/IdeaDetail';
+import CreateIdea from './pages/createIdea';
 import NotificationCenter from './components/NotificationCenter';
 import { AppProvider } from './contexts/AppContext';
 
@@ -192,19 +194,19 @@ const drawerWidth = 260;
 
 function NavItem({ to, icon, text, selected, onClick, badge }) {
   return (
-    <ListItem 
-      button 
-      component={Link} 
-      to={to} 
+    <ListItem
+      button
+      component={Link}
+      to={to}
       selected={selected}
       onClick={onClick}
-      sx={{ 
-        py: 1.5, 
-        my: 0.5, 
+      sx={{
+        py: 1.5,
+        my: 0.5,
         borderRadius: 2,
         color: selected ? 'primary.main' : 'grey.700',
         bgcolor: selected ? 'primary.light' : 'transparent',
-        '&.Mui-selected': { 
+        '&.Mui-selected': {
           bgcolor: 'rgba(0, 87, 184, 0.1)',
           '&:hover': {
             bgcolor: 'rgba(0, 87, 184, 0.15)',
@@ -215,7 +217,7 @@ function NavItem({ to, icon, text, selected, onClick, badge }) {
         }
       }}
     >
-      <ListItemIcon sx={{ 
+      <ListItemIcon sx={{
         color: selected ? 'primary.main' : 'grey.600',
         minWidth: 40,
       }}>
@@ -225,12 +227,12 @@ function NavItem({ to, icon, text, selected, onClick, badge }) {
           </Badge>
         ) : icon}
       </ListItemIcon>
-      <ListItemText 
-        primary={text} 
-        primaryTypographyProps={{ 
+      <ListItemText
+        primary={text}
+        primaryTypographyProps={{
           fontWeight: selected ? 600 : 500,
           fontSize: '0.95rem'
-        }} 
+        }}
       />
     </ListItem>
   );
@@ -259,30 +261,30 @@ function AppLayout() {
   const routes = [
     { path: '/', text: 'Dashboard', icon: <DashboardRoundedIcon /> },
     { path: '/ideas', text: 'Ideas', icon: <LightbulbRoundedIcon /> },
-    { path: '/submit', text: 'Submit Idea', icon: <AddCircleRoundedIcon /> },
+    { path: '/create', text: 'Create Idea', icon: <AddCircleRoundedIcon /> },
     { path: '/evaluation', text: 'Evaluation', icon: <AssessmentRoundedIcon /> },
     { path: '/settings', text: 'Settings', icon: <SettingsRoundedIcon /> },
   ];
 
   const drawer = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ 
-        p: 2, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: isMobile ? 'space-between' : 'center' 
+      <Box sx={{
+        p: 2,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: isMobile ? 'space-between' : 'center'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <LightbulbRoundedIcon 
-            sx={{ 
-              color: 'primary.main', 
-              mr: 1, 
-              fontSize: 28 
-            }} 
+          <LightbulbRoundedIcon
+            sx={{
+              color: 'primary.main',
+              mr: 1,
+              fontSize: 28
+            }}
           />
-          <Typography 
-            variant="h6" 
-            sx={{ 
+          <Typography
+            variant="h6"
+            sx={{
               fontWeight: 700,
               background: `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
               WebkitBackgroundClip: 'text',
@@ -298,17 +300,17 @@ function AppLayout() {
           </IconButton>
         )}
       </Box>
-      
+
       <Divider sx={{ mx: 2 }} />
-      
+
       <Box sx={{ px: 2, py: 3, flexGrow: 1 }}>
-        <Typography 
-          variant="body2" 
-          color="grey.600" 
-          sx={{ 
-            ml: 2, 
-            mb: 1, 
-            textTransform: 'uppercase', 
+        <Typography
+          variant="body2"
+          color="grey.600"
+          sx={{
+            ml: 2,
+            mb: 1,
+            textTransform: 'uppercase',
             fontSize: '0.75rem',
             fontWeight: 600,
             letterSpacing: '0.5px'
@@ -316,7 +318,7 @@ function AppLayout() {
         >
           Main Menu
         </Typography>
-        
+
         <List component="nav" disablePadding>
           {routes.map((route) => (
             <NavItem
@@ -331,7 +333,7 @@ function AppLayout() {
           ))}
         </List>
       </Box>
-      
+
       <Box sx={{ p: 2 }}>
         <Box
           sx={{
@@ -343,8 +345,8 @@ function AppLayout() {
           }}
         >
           <Avatar
-            sx={{ 
-              width: 40, 
+            sx={{
+              width: 40,
               height: 40,
               bgcolor: 'primary.main',
               color: 'white'
@@ -367,11 +369,11 @@ function AppLayout() {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar 
-        position="fixed" 
+      <AppBar
+        position="fixed"
         color="inherit"
-        sx={{ 
-          width: { md: `calc(100% - ${drawerWidth}px)` }, 
+        sx={{
+          width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
           bgcolor: 'background.paper'
@@ -416,8 +418,8 @@ function AppLayout() {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: drawerWidth,
               borderRight: 'none',
               boxShadow: '4px 0 10px rgba(0,0,0,0.05)'
@@ -426,14 +428,14 @@ function AppLayout() {
         >
           {drawer}
         </Drawer>
-        
+
         {/* Desktop drawer */}
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: drawerWidth,
               borderRight: '1px solid',
               borderColor: 'grey.100'
@@ -461,6 +463,8 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/ideas" element={<IdeaList />} />
+          <Route path="/ideas/:id" element={<IdeaDetail />} />
+          <Route path="/create" element={<CreateIdea />} />
           <Route path="/submit" element={<IdeaForm />} />
           <Route path="/evaluation" element={<AIEvaluation />} />
           <Route path="/settings" element={<Settings />} />
@@ -468,9 +472,9 @@ function AppLayout() {
       </Box>
 
       {/* Notifications panel */}
-      <NotificationCenter 
-        open={notificationsOpen} 
-        onClose={() => setNotificationsOpen(false)} 
+      <NotificationCenter
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
       />
     </Box>
   );
