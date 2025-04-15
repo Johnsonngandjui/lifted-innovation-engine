@@ -2,6 +2,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../contexts/AppContext';
+import axios from 'axios';
 import {
   Box,
   Card,
@@ -44,6 +45,9 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import GroupIcon from '@mui/icons-material/Group';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckIcon from '@mui/icons-material/Check';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 
 const CreateIdea = () => {
   const { addIdea, departments } = useContext(AppContext);
@@ -70,8 +74,11 @@ const CreateIdea = () => {
   
   const [errors, setErrors] = useState({});
   const [tagInput, setTagInput] = useState('');
+  const [aiEnhancedData, setAiEnhancedData] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
-  const steps = ['Basic Information', 'Problem & Impact', 'Review & Save'];
+  const steps = ['Basic Information', 'Problem & Impact', 'AI Enhancement', 'Review & Save'];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -131,8 +138,76 @@ const CreateIdea = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleAIEnhancement = async () => {
+    setAiLoading(true);
+    setAiError('');
+    
+    try {
+      // Format all the idea information in a clear structure
+      const ideaText = `
+# Innovation Idea Details
+
+## Basic Information
+Title: ${formData.title}
+Created by: ${formData.submittedBy}
+Department: ${formData.department}
+Tags: ${formData.tags.length > 0 ? formData.tags.join(', ') : 'None'}
+
+## Description
+${formData.description}
+
+## Problem Statement
+${formData.problemStatement}
+
+## Target Audience
+${formData.targetAudience || 'Not specified'}
+
+## Expected Impact
+${formData.expectedImpact}
+
+## Resources Needed
+${formData.resourcesNeeded || 'Not specified'}
+
+Please enhance this innovation idea to make it more compelling, impactful, and business-oriented. Maintain the core concept but improve clarity and presentation only use what is provided in the text for enhancement.
+ if you cannont enhance return nothing     `;
+      
+      // Send structured data to the API
+      const response = await axios.post('http://localhost:3001/gpt', {
+        message: ideaText,
+        type: 'idea_enhancement',  // Indicate the type of processing needed
+        context: {
+          stage: 'enhancement',
+          ideaMetadata: {
+            department: formData.department,
+            tags: formData.tags
+          }
+        }
+      });
+      
+      // Handle successful response
+      if (response.status === 200 && response.data && response.data.response) {
+        const enhancedData = response.data.response;
+        setAiEnhancedData(enhancedData);
+        
+        console.log('AI enhancement response:', enhancedData);
+        
+      } else {
+        throw new Error('Invalid or empty response from AI service');
+      }
+    } catch (error) {
+      console.error('AI enhancement error:', error);
+      setAiError(`Failed to enhance your idea: ${error.message}. Please try again or proceed to the next step.`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleNext = () => {
     if (validateStep()) {
+      // If moving from Problem & Impact to AI Enhancement, trigger AI processing
+      if (activeStep === 1) {
+        handleAIEnhancement();
+      }
       setActiveStep((prevStep) => prevStep + 1);
       window.scrollTo(0, 0);
     }
@@ -152,50 +227,56 @@ const CreateIdea = () => {
     
     setLoading(true);
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Add the idea as a draft
-    const newIdea = addIdea({
-      ...formData,
-      status: 'Draft'
-    });
-    
-    setLoading(false);
-    
-    // Show success message
-    setSnackbarMessage('Idea saved as draft successfully');
-    setSnackbarOpen(true);
-    
-    // Redirect to the ideas list
-    setTimeout(() => {
-      navigate('/ideas');
-    }, 1500);
+    try {
+      // Add the idea as a draft using the context function
+      const newIdea = await addIdea({
+        ...formData,
+        status: 'Draft'
+      });
+      
+      // Show success message
+      setSnackbarMessage('Idea saved as draft successfully');
+      setSnackbarOpen(true);
+      
+      // Redirect to the ideas list
+      setTimeout(() => {
+        navigate('/ideas');
+      }, 1500);
+    } catch (error) {
+      // Handle errors
+      setSnackbarMessage('Error saving draft: ' + (error.message || 'Please try again'));
+      setSnackbarOpen(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveIdea = async () => {
     if (validateStep()) {
       setLoading(true);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Add the idea
-      const newIdea = addIdea({
-        ...formData,
-        status: 'Created' // Status is "Created" but not yet submitted
-      });
-      
-      setLoading(false);
-      
-      // Show success message
-      setSnackbarMessage('Idea created successfully');
-      setSnackbarOpen(true);
-      
-      // Redirect to the idea detail page
-      setTimeout(() => {
-        navigate(`/ideas/${newIdea.id}`);
-      }, 1500);
+      try {
+        // Add the idea with created status
+        const newIdea = await addIdea({
+          ...formData,
+          status: 'Created' // Status is "Created" but not yet submitted
+        });
+        
+        // Show success message
+        setSnackbarMessage('Idea created successfully');
+        setSnackbarOpen(true);
+        
+        // Redirect to the idea detail page
+        setTimeout(() => {
+          navigate(`/ideas/${newIdea.id}`);
+        }, 1500);
+      } catch (error) {
+        // Handle errors
+        setSnackbarMessage('Error creating idea: ' + (error.message || 'Please try again'));
+        setSnackbarOpen(true);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -206,156 +287,178 @@ const CreateIdea = () => {
   const renderBasicInformationStep = () => {
     return (
       <Box>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          Let's start with the basics
+        <Typography variant="h6" sx={{ mb: 3, color: 'primary.main', fontWeight: 600 }}>
+          Step 1: Basic Information
         </Typography>
         
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Idea Title"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              error={!!errors.title}
-              helperText={errors.title || "Give your idea a clear, descriptive title"}
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <TitleIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
+        <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
+          <Typography variant="subtitle1" fontWeight="500" gutterBottom>
+            Main Idea Details
+          </Typography>
           
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Description"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              multiline
-              rows={4}
-              error={!!errors.description}
-              helperText={errors.description || "Describe your idea in a few sentences. What would you like to implement?"}
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <DescriptionIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Your Name"
-              name="submittedBy"
-              value={formData.submittedBy}
-              onChange={handleChange}
-              error={!!errors.submittedBy}
-              helperText={errors.submittedBy}
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <PersonIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth error={!!errors.department}>
-              <InputLabel id="department-label">Department</InputLabel>
-              <Select
-                labelId="department-label"
-                name="department"
-                value={formData.department}
-                onChange={handleChange}
-                label="Department"
-                required
-                startAdornment={
-                  <InputAdornment position="start">
-                    <BusinessIcon color="action" />
-                  </InputAdornment>
-                }
-              >
-                {departments.map((dept) => (
-                  <MenuItem key={dept} value={dept}>
-                    {dept}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.department && (
-                <Typography variant="caption" color="error">
-                  {errors.department}
-                </Typography>
-              )}
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Box sx={{ mb: 1 }}>
-              <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                <LocalOfferIcon sx={{ mr: 1, fontSize: '1.2rem', color: 'action.active' }} />
-                Tags
-                <Tooltip title="Add relevant keywords to categorize your idea (e.g., 'automation', 'customer experience', 'cost saving')">
-                  <IconButton size="small" sx={{ ml: 0.5 }}>
-                    <HelpOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Typography>
-            </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Add Tag"
-                placeholder="Type and press Enter"
-                value={tagInput}
-                onChange={handleTagInputChange}
-                onKeyDown={handleTagKeyDown}
-                size="small"
-                sx={{ mr: 1 }}
+                label="Idea Title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                error={!!errors.title}
+                helperText={errors.title || "Give your idea a clear, descriptive title"}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <TitleIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
               />
-              <Button 
-                variant="outlined" 
-                onClick={addTag}
-                startIcon={<AddIcon />}
-              >
-                Add
-              </Button>
-            </Box>
+            </Grid>
             
-            <Paper variant="outlined" sx={{ p: 1, minHeight: 50, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {formData.tags.length > 0 ? (
-                formData.tags.map((tag) => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    onDelete={() => handleDeleteTag(tag)}
-                    color="primary"
-                    variant="outlined"
-                    size="small"
-                  />
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
-                  No tags added yet
-                </Typography>
-              )}
-            </Paper>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                multiline
+                rows={4}
+                error={!!errors.description}
+                helperText={errors.description || "Describe your idea in a few sentences. What would you like to implement?"}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <DescriptionIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
           </Grid>
-        </Grid>
+        </Paper>
+        
+        <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
+          <Typography variant="subtitle1" fontWeight="500" gutterBottom>
+            Author Information
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Your Name"
+                name="submittedBy"
+                value={formData.submittedBy}
+                onChange={handleChange}
+                error={!!errors.submittedBy}
+                helperText={errors.submittedBy || "Enter your full name"}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <FormControl fullWidth error={!!errors.department}>
+                <InputLabel id="department-label">Department</InputLabel>
+                <Select
+                  labelId="department-label"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  label="Department"
+                  required
+                  displayEmpty
+                  sx={{ 
+                    minWidth: '100%',
+                    '& .MuiInputBase-input': { 
+                      display: 'flex',
+                      alignItems: 'center'
+                    }
+                  }}
+                  startAdornment={
+                    <InputAdornment position="start">
+                      <BusinessIcon color="primary" />
+                    </InputAdornment>
+                  }
+                >
+                  <MenuItem value="" disabled>
+                    <em>Select your department</em>
+                  </MenuItem>
+                  <MenuItem value="HR">Engineering</MenuItem>
+                  <MenuItem value="TECHNOLOGY">Marketing</MenuItem>
+                  <MenuItem value="FINANCE">Sales</MenuItem>
+                  <MenuItem value="LEGAL">Legal</MenuItem>
+                </Select>
+                {errors.department && (
+                  <Typography variant="caption" color="error">
+                    {errors.department}
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Paper>
+        
+        <Paper variant="outlined" sx={{ p: 3, bgcolor: 'background.paper' }}>
+          <Typography variant="subtitle1" fontWeight="500" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+            <LocalOfferIcon sx={{ mr: 1, color: 'primary.main' }} />
+            Tags
+            <Tooltip title="Add relevant keywords to categorize your idea (e.g., 'automation', 'customer experience', 'cost saving')">
+              <IconButton size="small" sx={{ ml: 0.5 }}>
+                <HelpOutlineIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+            <TextField
+              fullWidth
+              label="Add Tag"
+              placeholder="Type and press Enter"
+              value={tagInput}
+              onChange={handleTagInputChange}
+              onKeyDown={handleTagKeyDown}
+              size="small"
+              sx={{ mr: 1 }}
+            />
+            <Button 
+              variant="outlined" 
+              onClick={addTag}
+              startIcon={<AddIcon />}
+            >
+              Add
+            </Button>
+          </Box>
+          
+          <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, minHeight: 50, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {formData.tags.length > 0 ? (
+              formData.tags.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={tag}
+                  onDelete={() => handleDeleteTag(tag)}
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                />
+              ))
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
+                No tags added yet
+              </Typography>
+            )}
+          </Box>
+        </Paper>
       </Box>
     );
   };
@@ -363,97 +466,266 @@ const CreateIdea = () => {
   const renderDetailsStep = () => {
     return (
       <Box>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          Tell us more about the impact
+
+        <Typography variant="h6" sx={{ mb: 3, color: 'primary.main', fontWeight: 600 }}>
+          Step 2: Problem & Impact
         </Typography>
         
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Problem Statement"
-              name="problemStatement"
-              value={formData.problemStatement}
-              onChange={handleChange}
-              multiline
-              rows={3}
-              placeholder="What specific problem does this idea solve?"
-              error={!!errors.problemStatement}
-              helperText={errors.problemStatement || "Clearly define the problem your idea addresses"}
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <AssignmentIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
+        <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
+          <Typography variant="subtitle1" fontWeight="500" gutterBottom>
+            Problem Definition
+          </Typography>
           
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Target Audience"
-              name="targetAudience"
-              value={formData.targetAudience}
-              onChange={handleChange}
-              placeholder="Who will benefit from this innovation?"
-              helperText="Specify which teams, customers, or stakeholders would benefit"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <GroupIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Problem Statement"
+                name="problemStatement"
+                value={formData.problemStatement}
+                onChange={handleChange}
+                multiline
+                rows={3}
+                placeholder="What specific problem does this idea solve?"
+                error={!!errors.problemStatement}
+                helperText={errors.problemStatement || "Clearly define the problem your idea addresses"}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AssignmentIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Target Audience"
+                name="targetAudience"
+                value={formData.targetAudience}
+                onChange={handleChange}
+                placeholder="Who will benefit from this innovation?"
+                helperText="Specify which teams, customers, or stakeholders would benefit"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <GroupIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
           </Grid>
+        </Paper>
+        
+        <Paper variant="outlined" sx={{ p: 3, bgcolor: 'background.paper' }}>
+          <Typography variant="subtitle1" fontWeight="500" gutterBottom>
+            Impact & Resources
+          </Typography>
           
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Expected Impact"
-              name="expectedImpact"
-              value={formData.expectedImpact}
-              onChange={handleChange}
-              multiline
-              rows={3}
-              placeholder="How will this idea benefit the company? Include metrics if possible."
-              error={!!errors.expectedImpact}
-              helperText={errors.expectedImpact || "Describe the expected benefits, ROI, or improvements"}
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <TrendingUpIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Expected Impact"
+                name="expectedImpact"
+                value={formData.expectedImpact}
+                onChange={handleChange}
+                multiline
+                rows={3}
+                placeholder="How will this idea benefit the company? Include metrics if possible."
+                error={!!errors.expectedImpact}
+                helperText={errors.expectedImpact || "Describe the expected benefits, ROI, or improvements"}
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <TrendingUpIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Resources Needed"
+                name="resourcesNeeded"
+                value={formData.resourcesNeeded}
+                onChange={handleChange}
+                multiline
+                rows={2}
+                placeholder="What resources would be required to implement this idea?"
+                helperText="Consider people, time, budget, technology needs, etc."
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AttachMoneyIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
           </Grid>
-          
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Resources Needed"
-              name="resourcesNeeded"
-              value={formData.resourcesNeeded}
-              onChange={handleChange}
-              multiline
-              rows={2}
-              placeholder="What resources would be required to implement this idea?"
-              helperText="Consider people, time, budget, technology needs, etc."
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <AttachMoneyIcon color="action" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-        </Grid>
+        </Paper>
+      </Box>
+    );
+  };
+
+  const renderAIEnhancementStep = () => {
+    return (
+      <Box>
+        <Typography variant="h6" sx={{ mb: 3 }}>
+          AI Enhancement
+        </Typography>
+        
+        <Alert 
+          severity="info" 
+          sx={{ mb: 3 }}
+        >
+          Our AI assistant will analyze your idea and suggest improvements to enhance its clarity, impact, and alignment with business goals.
+        </Alert>
+        
+        {aiLoading ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
+            <CircularProgress size={40} />
+            <Typography variant="body1" sx={{ mt: 2 }}>
+              Enhancing your idea...
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              This may take a few moments
+            </Typography>
+          </Box>
+        ) : aiError ? (
+          <Box>
+            <Alert 
+              severity="error" 
+              sx={{ mb: 3 }}
+            >
+              {aiError}
+            </Alert>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Button 
+                variant="outlined" 
+                onClick={handleAIEnhancement}
+                startIcon={<RefreshIcon />}
+              >
+                Try Again
+              </Button>
+            </Box>
+          </Box>
+        ) : aiEnhancedData ? (
+          <Box>
+            {/* Original vs Enhanced comparison */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined" sx={{ height: '100%' }}>
+                  <Box sx={{ p: 2, bgcolor: 'grey.100' }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Original Description
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2 }}>
+                    <Typography variant="body1">
+                      {formData.description}
+                    </Typography>
+                  </Box>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined" sx={{ height: '100%', boxShadow: '0 0 5px rgba(0,0,0,0.1)' }}>
+                  <Box sx={{ p: 2, bgcolor: 'primary.light', color: 'white' }}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Enhanced Description
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2 }}>
+                    <Typography variant="body1" paragraph>
+                      {aiEnhancedData.rewritten || 'No enhancements suggested.'}
+                    </Typography>
+                  </Box>
+                </Card>
+              </Grid>
+            </Grid>
+            
+            {/* AI Evaluation */}
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <Box sx={{ p: 2, bgcolor: 'info.light', color: 'white' }}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  AI Evaluation & Feedback
+                </Typography>
+              </Box>
+              <Box sx={{ p: 2 }}>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+                  {aiEnhancedData.evaluation || 'No evaluation provided.'}
+                </Typography>
+              </Box>
+            </Card>
+            
+            {/* Action buttons */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+              <Button 
+                variant="outlined" 
+                onClick={handleAIEnhancement}
+                startIcon={<RefreshIcon />}
+                disabled={aiLoading}
+              >
+                Regenerate
+              </Button>
+              
+              <Box>
+                <Button 
+                  variant="outlined"
+                  color="inherit"
+                  onClick={() => handleNext()}
+                  sx={{ mr: 2 }}
+                >
+                  Keep Original
+                </Button>
+                
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  onClick={() => {
+                    // Keep the enhanced version in the form data
+                    setFormData(prev => ({
+                      ...prev,
+                      description: aiEnhancedData.rewritten || prev.description,
+                      aiEnhanced: true
+                    }));
+                    handleNext();
+                  }}
+                  endIcon={<CheckIcon />}
+                >
+                  Use Enhanced Version
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
+            <Typography variant="body1" paragraph align="center">
+              Ready to enhance your idea? Our AI can help make your innovation more impactful.
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleAIEnhancement}
+              size="large"
+              startIcon={<AutoFixHighIcon />}
+              sx={{ py: 1, px: 3 }}
+            >
+              Enhance My Idea
+            </Button>
+            <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+              You can also skip this step and proceed to review
+            </Typography>
+          </Box>
+        )}
       </Box>
     );
   };
@@ -595,7 +867,7 @@ const CreateIdea = () => {
       <Card sx={{ p: 3, mb: 4 }}>
         <form onSubmit={(e) => {
           e.preventDefault();
-          if (activeStep === 2) {
+          if (activeStep === 3) { // Now review is step 3
             handleSaveIdea();
           } else {
             handleNext();
@@ -603,7 +875,8 @@ const CreateIdea = () => {
         }}>
           {activeStep === 0 && renderBasicInformationStep()}
           {activeStep === 1 && renderDetailsStep()}
-          {activeStep === 2 && renderReviewStep()}
+          {activeStep === 2 && renderAIEnhancementStep()}
+          {activeStep === 3 && renderReviewStep()}
           
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
             <Box>
@@ -629,13 +902,15 @@ const CreateIdea = () => {
                 Save as Draft
               </Button>
               
-              {activeStep < 2 ? (
+              {activeStep < 3 ? (
                 <Button
                   variant="contained"
                   type="submit"
                   endIcon={<ArrowForwardIcon />}
+                  // Skip button should be disabled during AI loading
+                  disabled={activeStep === 2 && aiLoading}
                 >
-                  Continue
+                  {activeStep === 2 ? 'Skip Enhancement' : 'Continue'}
                 </Button>
               ) : (
                 <Button

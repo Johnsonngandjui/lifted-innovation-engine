@@ -23,20 +23,51 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Tab,
+  Tabs,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Chip
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SaveIcon from '@mui/icons-material/Save';
 import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
 import KeyIcon from '@mui/icons-material/Key';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import BusinessIcon from '@mui/icons-material/Business';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 
 const Settings = () => {
   const { aiConfig, updateAIConfig } = useContext(AppContext);
-  const [localConfig, setLocalConfig] = useState({ ...aiConfig });
+  const [localConfig, setLocalConfig] = useState({ 
+    enabled: aiConfig?.enabled || false,
+    apiKey: aiConfig?.apiKey || '',
+    model: aiConfig?.model || 'gpt-4o',
+    temperature: aiConfig?.temperature || 0.7,
+    isAdmin: aiConfig?.isAdmin || false,
+    evaluationPrompt: aiConfig?.evaluationPrompt || "Evaluate this idea based on innovation, feasibility, and business impact.",
+    companyFocus: aiConfig?.companyFocus || [],
+    evaluationResources: aiConfig?.evaluationResources || []
+  });
+  
+  const [companyGuidelines, setCompanyGuidelines] = useState(
+    aiConfig?.companyGuidelines || "Our company is currently focusing on sustainability and digital transformation initiatives."
+  );
+
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [adminTabValue, setAdminTabValue] = useState(0);
+  const [newFocusPoint, setNewFocusPoint] = useState("");
+  const [newResourceName, setNewResourceName] = useState("");
+  const [newResourceContent, setNewResourceContent] = useState("");
   
+  // Rest of your existing handlers...
   const handleToggleAI = (event) => {
     setLocalConfig({
       ...localConfig,
@@ -65,8 +96,79 @@ const Settings = () => {
     });
   };
   
+  // New handlers for admin functionality
+  const handleToggleAdmin = (event) => {
+    setLocalConfig({
+      ...localConfig,
+      isAdmin: event.target.checked
+    });
+  };
+
+  const handleEvaluationPromptChange = (event) => {
+    setLocalConfig({
+      ...localConfig,
+      evaluationPrompt: event.target.value
+    });
+  };
+
+  const handleAdminTabChange = (event, newValue) => {
+    setAdminTabValue(newValue);
+  };
+
+  const handleAddFocusPoint = () => {
+    if (newFocusPoint.trim()) {
+      setLocalConfig({
+        ...localConfig,
+        companyFocus: [...localConfig.companyFocus, newFocusPoint.trim()]
+      });
+      setNewFocusPoint("");
+    }
+  };
+
+  const handleDeleteFocusPoint = (index) => {
+    const updatedFocus = [...localConfig.companyFocus];
+    updatedFocus.splice(index, 1);
+    setLocalConfig({
+      ...localConfig,
+      companyFocus: updatedFocus
+    });
+  };
+
+  const handleAddResource = () => {
+    if (newResourceName.trim() && newResourceContent.trim()) {
+      setLocalConfig({
+        ...localConfig,
+        evaluationResources: [
+          ...localConfig.evaluationResources,
+          {
+            name: newResourceName.trim(),
+            content: newResourceContent.trim()
+          }
+        ]
+      });
+      setNewResourceName("");
+      setNewResourceContent("");
+    }
+  };
+
+  const handleDeleteResource = (index) => {
+    const updatedResources = [...localConfig.evaluationResources];
+    updatedResources.splice(index, 1);
+    setLocalConfig({
+      ...localConfig,
+      evaluationResources: updatedResources
+    });
+  };
+
+  const handleCompanyGuidelinesChange = (event) => {
+    setCompanyGuidelines(event.target.value);
+  };
+  
   const handleSaveSettings = () => {
-    updateAIConfig(localConfig);
+    updateAIConfig({
+      ...localConfig,
+      companyGuidelines: companyGuidelines
+    });
     setSaveSuccess(true);
     
     setTimeout(() => {
@@ -89,10 +191,27 @@ const Settings = () => {
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h5" gutterBottom display="flex" alignItems="center">
-              <TipsAndUpdatesIcon sx={{ mr: 1, color: 'secondary.main' }} />
-              AI Integration Settings
-            </Typography>
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h5" gutterBottom display="flex" alignItems="center">
+                <TipsAndUpdatesIcon sx={{ mr: 1, color: 'secondary.main' }} />
+                AI Integration Settings
+              </Typography>
+              
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={localConfig.isAdmin}
+                    onChange={handleToggleAdmin}
+                    color="secondary"
+                  />
+                }
+                label={
+                  <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center' }}>
+                    <AdminPanelSettingsIcon sx={{ mr: 0.5 }} /> Admin Mode
+                  </Typography>
+                }
+              />
+            </Box>
             
             <Typography variant="body1" paragraph color="text.secondary">
               Configure the AI engine that powers the innovation evaluation system. The AI helps evaluate, enhance, and score submitted ideas.
@@ -201,6 +320,279 @@ const Settings = () => {
                   </Box>
                 </CardContent>
               </Card>
+
+              {/* Innovation Guidelines - Visible to everyone */}
+              <Card variant="outlined" sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom display="flex" alignItems="center">
+                    <BusinessIcon sx={{ mr: 1, fontSize: '1.2rem', color: 'primary.main' }} />
+                    Company Innovation Guidelines
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    These guidelines define what the company is currently looking for in innovation ideas.
+                    {!localConfig.isAdmin && " Only admins can modify these guidelines."}
+                  </Typography>
+                  
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="Company Guidelines"
+                    value={companyGuidelines}
+                    onChange={handleCompanyGuidelinesChange}
+                    placeholder="Describe what innovation areas the company is currently focusing on..."
+                    variant="outlined"
+                    disabled={!localConfig.isAdmin}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  {!localConfig.isAdmin && (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      These guidelines help you understand what kinds of innovation ideas are currently valued by the company.
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Evaluation Criteria - Visible to everyone */}
+              <Card variant="outlined" sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom display="flex" alignItems="center">
+                    <TipsAndUpdatesIcon sx={{ mr: 1, fontSize: '1.2rem', color: 'primary.main' }} />
+                    Evaluation Criteria Settings
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" paragraph>
+                    Customize how ideas should be evaluated. These settings affect how the AI judges feasibility, impact, and other aspects of innovation ideas.
+                  </Typography>
+                  
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={6}
+                    label="Evaluation Prompt"
+                    value={localConfig.evaluationPrompt}
+                    onChange={handleEvaluationPromptChange}
+                    placeholder="Describe how ideas should be evaluated..."
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    You can customize how ideas are evaluated. Focus on aspects like feasibility, business impact, innovation level, and alignment with company goals.
+                  </Alert>
+                </CardContent>
+              </Card>
+              
+              {/* Admin Configuration Panel */}
+              <Collapse in={localConfig.isAdmin}>
+                <Paper variant="outlined" sx={{ mb: 3, p: 0 }}>
+                  <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                    <Tabs 
+                      value={adminTabValue} 
+                      onChange={handleAdminTabChange}
+                      aria-label="admin configuration tabs"
+                    >
+                      <Tab label="Evaluation Prompt" />
+                      <Tab label="Company Focus" />
+                      <Tab label="Resources" />
+                    </Tabs>
+                  </Box>
+                  
+                  {/* Evaluation Prompt Tab */}
+                  <Box sx={{ p: 3, display: adminTabValue === 0 ? 'block' : 'none' }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      AI Evaluation Prompt
+                      <Tooltip title="This is the prompt that will be sent to the AI for evaluating ideas. You can customize it to focus on specific aspects.">
+                        <IconButton size="small">
+                          <HelpOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Typography>
+                    
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={8}
+                      label="Evaluation Prompt Template"
+                      value={localConfig.evaluationPrompt}
+                      onChange={handleEvaluationPromptChange}
+                      placeholder="You are an innovation expert tasked with evaluating an idea..."
+                      variant="outlined"
+                      sx={{ mb: 2 }}
+                    />
+                    
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Use {'{idea}'} as a placeholder for where the idea text should be inserted. You can use {'{companyFocus}'} to insert the company's current focus areas.
+                    </Alert>
+                    
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Tips for effective prompts:
+                    </Typography>
+                    <ul>
+                      <Typography component="li" variant="body2" color="text.secondary">
+                        Be specific about evaluation criteria (feasibility, innovation, impact)
+                      </Typography>
+                      <Typography component="li" variant="body2" color="text.secondary">
+                        Ask the AI to provide scores on a specific scale (e.g., 1-10)
+                      </Typography>
+                      <Typography component="li" variant="body2" color="text.secondary">
+                        Request specific feedback categories for idea improvement
+                      </Typography>
+                    </ul>
+                  </Box>
+                  
+                  {/* Company Focus Tab */}
+                  <Box sx={{ p: 3, display: adminTabValue === 1 ? 'block' : 'none' }}>
+                    <Typography variant="subtitle1" gutterBottom display="flex" alignItems="center">
+                      <BusinessIcon sx={{ mr: 1, color: 'primary.main' }} />
+                      Company Focus Areas
+                    </Typography>
+                    
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      Define the current strategic focus areas for your company. These will guide the AI in evaluating how well ideas align with business objectives.
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', mb: 2 }}>
+                      <TextField
+                        fullWidth
+                        label="New Focus Point"
+                        value={newFocusPoint}
+                        onChange={(e) => setNewFocusPoint(e.target.value)}
+                        placeholder="e.g., Sustainability initiatives"
+                        sx={{ mr: 1 }}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={handleAddFocusPoint}
+                        startIcon={<AddIcon />}
+                      >
+                        Add
+                      </Button>
+                    </Box>
+                    
+                    <Paper variant="outlined" sx={{ mb: 2 }}>
+                      <List dense>
+                        {localConfig.companyFocus.length === 0 ? (
+                          <ListItem>
+                            <ListItemText 
+                              primary="No focus points defined yet"
+                              secondary="Add focus points to help the AI evaluate ideas in context of your business goals"
+                            />
+                          </ListItem>
+                        ) : (
+                          localConfig.companyFocus.map((focus, index) => (
+                            <ListItem key={index} divider={index < localConfig.companyFocus.length - 1}>
+                              <ListItemText primary={focus} />
+                              <ListItemSecondaryAction>
+                                <IconButton edge="end" onClick={() => handleDeleteFocusPoint(index)}>
+                                  <DeleteIcon />
+                                </IconButton>
+                              </ListItemSecondaryAction>
+                            </ListItem>
+                          ))
+                        )}
+                      </List>
+                    </Paper>
+                    
+                    <Alert severity="info">
+                      These focus points will be provided to the AI to help it understand your company's priorities when evaluating ideas.
+                    </Alert>
+                  </Box>
+                  
+                  {/* Resources Tab */}
+                  <Box sx={{ p: 3, display: adminTabValue === 2 ? 'block' : 'none' }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Evaluation Resources
+                      <Tooltip title="Provide additional context and materials to help the AI evaluate ideas more effectively.">
+                        <IconButton size="small">
+                          <HelpOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Typography>
+                    
+                    <Typography variant="body2" color="text.secondary" paragraph>
+                      Add knowledge resources that will be used by the AI when evaluating ideas. These could include company guidelines, industry standards, or market research.
+                    </Typography>
+                    
+                    <Box sx={{ mb: 3 }}>
+                      <TextField
+                        fullWidth
+                        label="Resource Name"
+                        value={newResourceName}
+                        onChange={(e) => setNewResourceName(e.target.value)}
+                        placeholder="e.g., Company Values"
+                        sx={{ mb: 2 }}
+                      />
+                      
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={4}
+                        label="Resource Content"
+                        value={newResourceContent}
+                        onChange={(e) => setNewResourceContent(e.target.value)}
+                        placeholder="Enter text content or reference information..."
+                        sx={{ mb: 2 }}
+                      />
+                      
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Button
+                          variant="outlined"
+                          startIcon={<UploadFileIcon />}
+                          disabled
+                        >
+                          Upload File (Coming Soon)
+                        </Button>
+                        
+                        <Button
+                          variant="contained"
+                          onClick={handleAddResource}
+                          startIcon={<AddIcon />}
+                          disabled={!newResourceName.trim() || !newResourceContent.trim()}
+                        >
+                          Add Resource
+                        </Button>
+                      </Box>
+                    </Box>
+                    
+                    <Divider sx={{ mb: 2 }} />
+                    
+                    <Typography variant="subtitle2" gutterBottom>
+                      Current Resources ({localConfig.evaluationResources.length})
+                    </Typography>
+                    
+                    {localConfig.evaluationResources.length === 0 ? (
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        No resources have been added yet. Add resources to improve the AI's understanding of your company context.
+                      </Alert>
+                    ) : (
+                      <List>
+                        {localConfig.evaluationResources.map((resource, index) => (
+                          <Paper key={index} variant="outlined" sx={{ mb: 2, p: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                              <Typography variant="subtitle2">{resource.name}</Typography>
+                              <IconButton size="small" onClick={() => handleDeleteResource(index)}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{
+                              maxHeight: '100px',
+                              overflow: 'auto',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {resource.content.length > 150 
+                                ? `${resource.content.substring(0, 150)}...` 
+                                : resource.content}
+                            </Typography>
+                          </Paper>
+                        ))}
+                      </List>
+                    )}
+                  </Box>
+                </Paper>
+              </Collapse>
               
               <Accordion>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -292,6 +684,17 @@ const Settings = () => {
             <Typography variant="body2" paragraph>
               The AI helps evaluate innovation ideas by analyzing feasibility, impact, alignment with business goals, innovation level, and scalability.
             </Typography>
+            
+            {localConfig.isAdmin && (
+              <>
+                <Typography variant="subtitle2" gutterBottom>
+                  Admin Settings
+                </Typography>
+                <Typography variant="body2" paragraph>
+                  As an admin, you can customize the AI evaluation prompts, define company focus areas, and add knowledge resources to improve evaluation quality.
+                </Typography>
+              </>
+            )}
             
             <Typography variant="subtitle2" gutterBottom>
               Do I need an API key?
