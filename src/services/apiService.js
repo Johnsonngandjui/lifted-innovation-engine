@@ -157,7 +157,34 @@ const apiService = {
       console.error('Error enhancing idea with AI:', error);
       throw error;
     }
+  },
+
+  /**
+ * Evaluate an idea with AI
+ * @param {Object} ideaData - The idea data to evaluate
+ * @returns {Promise<Object>} The evaluation results
+ */
+async evaluateIdea(ideaData) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/idea/evaluate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(ideaData),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error evaluating idea:', error);
+    throw error;
   }
+}
 };
 
 export default apiService;

@@ -177,10 +177,125 @@ const statusOptions = [
     "Rejected"
 ];
 
+const aiEvaluationPrompts = {
+    innovation: `
+  You are an innovation expert tasked with evaluating the innovation level of a business idea.
+  
+  Analyze the following idea in terms of its originality, creativity, and novelty:
+  
+  {IDEA_DESCRIPTION}
+  
+  Consider the following aspects in your evaluation:
+  1. How unique is this idea compared to existing solutions?
+  2. Does it introduce new approaches, technologies, or methodologies?
+  3. Does it challenge conventional thinking in its domain?
+  4. Is it a novel recombination of existing ideas?
+  5. How forward-thinking is the concept?
+  
+  Provide a score from 0-100 where:
+  - 0-20: Not innovative (completely derivative)
+  - 21-40: Slightly innovative (minor improvements to existing solutions)
+  - 41-60: Moderately innovative (meaningful improvements but familiar concept)
+  - 61-80: Highly innovative (original approach with significant novelty)
+  - 81-100: Breakthrough innovation (paradigm-shifting potential)
+  
+  Return your response in the following JSON format:
+  {
+    "score": [NUMERIC_SCORE],
+    "explanation": "[Detailed explanation of your evaluation, highlighting strengths and areas for improvement]"
+  }
+  `,
+    
+    impact: `
+  You are a business impact analyst tasked with evaluating the potential impact of a business idea.
+  
+  Analyze the following idea in terms of its potential impact on business operations, customer experience, and overall value:
+  
+  {IDEA_DESCRIPTION}
+  
+  Consider the following aspects in your evaluation:
+  1. What is the potential ROI of this idea?
+  2. How many users/customers/employees would benefit from this idea?
+  3. How significant is the improvement over current methods or processes?
+  4. Does it address critical pain points or create substantial new value?
+  5. What is the scope of impact (team, department, organization, industry)?
+  
+  Provide a score from 0-100 where:
+  - 0-20: Minimal impact (affects few people with minor improvements)
+  - 21-40: Modest impact (provides moderate benefits to a limited audience)
+  - 41-60: Significant impact (substantial improvements for many stakeholders)
+  - 61-80: Major impact (transformative effects across the organization)
+  - 81-100: Revolutionary impact (potential to reshape the industry or market)
+  
+  Return your response in the following JSON format:
+  {
+    "score": [NUMERIC_SCORE],
+    "explanation": "[Detailed explanation of your evaluation, highlighting strengths and areas for improvement]"
+  }
+  `,
+    
+    alignment: `
+  You are a strategic alignment specialist tasked with evaluating how well a business idea aligns with organizational goals.
+  
+  Analyze the following idea in terms of its alignment with company strategy, values, and objectives:
+  
+  {IDEA_DESCRIPTION}
+  
+  Consider the following aspects in your evaluation:
+  1. How well does this idea support current strategic initiatives?
+  2. Does it align with the company's mission and values?
+  3. How does it fit with other ongoing projects and priorities?
+  4. Does it address business needs that are recognized as important?
+  5. Is it consistent with the organization's long-term vision?
+  
+  Provide a score from 0-100 where:
+  - 0-20: Misaligned (conflicts with current strategy or priorities)
+  - 21-40: Tangentially aligned (limited connection to strategic goals)
+  - 41-60: Moderately aligned (supports some strategic objectives)
+  - 61-80: Well aligned (clearly supports multiple strategic priorities)
+  - 81-100: Perfectly aligned (embodies core strategic initiatives)
+  
+  Return your response in the following JSON format:
+  {
+    "score": [NUMERIC_SCORE],
+    "explanation": "[Detailed explanation of your evaluation, highlighting strengths and areas for improvement]"
+  }
+  `,
+    
+    feasibility: `
+  You are a technical feasibility expert tasked with evaluating how practical and implementable a business idea is.
+  
+  Analyze the following idea in terms of its technical feasibility, resource requirements, and implementation challenges:
+  
+  {IDEA_DESCRIPTION}
+  
+  Consider the following aspects in your evaluation:
+  1. What technical capabilities are required to implement this idea?
+  2. Are the necessary resources (people, budget, time) available or obtainable?
+  3. What are the major implementation challenges or risks?
+  4. Is the timeline realistic given the scope and complexity?
+  5. Are there dependencies on external factors outside of control?
+  
+  Provide a score from 0-100 where:
+  - 0-20: Highly infeasible (requires unobtainable resources or technology)
+  - 21-40: Challenging feasibility (significant obstacles to implementation)
+  - 41-60: Moderate feasibility (implementable with substantial effort)
+  - 61-80: Good feasibility (reasonable resource requirements and technical scope)
+  - 81-100: Highly feasible (easily implementable with current resources)
+  
+  Return your response in the following JSON format:
+  {
+    "score": [NUMERIC_SCORE],
+    "explanation": "[Detailed explanation of your evaluation, highlighting strengths and areas for improvement]"
+  }
+  `
+  };
+
 module.exports = {
     mockIdeas,
     departments,
     aiEvaluationQuestions,
     aiEvaluationCriteria,
-    statusOptions
+    statusOptions,
+    aiEvaluationPrompts
 };

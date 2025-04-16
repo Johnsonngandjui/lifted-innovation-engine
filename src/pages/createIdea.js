@@ -1,4 +1,4 @@
-// pages/CreateIdea.js - New Idea Creation Flow with MongoDB integration
+// pages/CreateIdea.js - New Idea Creation Flow with MongoDB integration and AI Evaluation
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../contexts/AppContext';
@@ -30,6 +30,7 @@ import {
   Snackbar,
   FormControlLabel,
   Switch,
+  LinearProgress,
 } from '@mui/material';
 
 // Icons
@@ -50,7 +51,11 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckIcon from '@mui/icons-material/Check';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
-import apiService from '../services/apiService'
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
+import AlignHorizontalLeftIcon from '@mui/icons-material/AlignHorizontalLeft';
+import BuildIcon from '@mui/icons-material/Build';
+import apiService from '../services/apiService';
 
 const CreateIdea = () => {
   const { addIdea, departments } = useContext(AppContext);
@@ -83,6 +88,7 @@ const CreateIdea = () => {
   const [errors, setErrors] = useState({});
   const [tagInput, setTagInput] = useState('');
   const [aiEnhancedData, setAiEnhancedData] = useState(null);
+  const [evaluationResults, setEvaluationResults] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
@@ -153,20 +159,19 @@ const CreateIdea = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
-  const handleAIEnhancement = async () => {
-    setAiLoading(true);
-    setAiError('');
-    
-    try {
-      // Format all the idea information in a clear structure
-      const ideaText = `
+const handleAIEnhancement = async () => {
+  setAiLoading(true);
+  setAiError('');
+  
+  try {
+    // Format all the idea information in a clear structure
+    const ideaText = `
 # Innovation Idea Details
 
 ## Basic Information
 Title: ${formData.ideaName}
 Created by: ${formData.authorName}
-Department: ${formData.authorDept}
+
 Tags: ${formData.tags.length > 0 ? formData.tags.join(', ') : 'None'}
 
 ## Description
@@ -185,38 +190,56 @@ ${formData.expectedImpact}
 ${formData.resources || 'Not specified'}
 
 Please enhance this innovation idea to make it more compelling, impactful, and business-oriented. Maintain the core concept but improve clarity and presentation only use what is provided in the text for enhancement.
- if you cannont enhance return nothing     `;
-      
-      // Send structured data to the API
-      const response = await axios.post('http://localhost:3001/gpt', {
-        message: ideaText,
-        type: 'idea_enhancement',  // Indicate the type of processing needed
-        context: {
-          stage: 'enhancement',
-          ideaMetadata: {
-            department: formData.authorDept,
-            tags: formData.tags
-          }
+if you cannot enhance return nothing`;
+    
+    // Step 1: Get the enhanced description from the GPT endpoint
+    const enhancementResponse = await axios.post('http://localhost:3001/gpt', {
+      message: ideaText,
+      type: 'idea_enhancement',
+      context: {
+        stage: 'enhancement',
+        ideaMetadata: {
+          department: formData.authorDept,
+          tags: formData.tags
         }
-      });
-      
-      // Handle successful response
-      if (response.status === 200 && response.data && response.data.response) {
-        const enhancedData = response.data.response;
-        setAiEnhancedData(enhancedData);
-        
-        console.log('AI enhancement response:', enhancedData);
-        
-      } else {
-        throw new Error('Invalid or empty response from AI service');
       }
-    } catch (error) {
-      console.error('AI enhancement error:', error);
-      setAiError(`Failed to enhance your idea: ${error.message}. Please try again or proceed to the next step.`);
-    } finally {
-      setAiLoading(false);
+    });
+    
+    // Extract the enhanced description
+    let enhancedData = { rewritten: formData.description, evaluation: '' };
+    if (enhancementResponse.status === 200 && enhancementResponse.data && enhancementResponse.data.response) {
+      enhancedData = enhancementResponse.data.response;
     }
-  };
+    
+    // Update state with enhancement results
+    setAiEnhancedData(enhancedData);
+    
+    // Step 2: Get the evaluation scores and explanations using the dedicated endpoint
+    const evaluationResponse = await apiService.evaluateIdea({
+      ideaName: formData.ideaName,
+      description: enhancedData.rewritten || formData.description, // Use enhanced description if available
+      authorName: formData.authorName,
+      authorDept: formData.authorDept,
+      tags: formData.tags,
+      problemStatement: formData.problemStatement,
+      audience: formData.audience,
+      expectedImpact: formData.expectedImpact,
+      resources: formData.resources
+    });
+    
+    // Update state with evaluation results
+    setEvaluationResults(evaluationResponse);
+    
+    console.log('AI enhancement response:', enhancedData);
+    console.log('AI evaluation results:', evaluationResponse);
+    
+  } catch (error) {
+    console.error('AI enhancement error:', error);
+    setAiError(`Failed to enhance your idea: ${error.message}. Please try again or proceed to the next step.`);
+  } finally {
+    setAiLoading(false);
+  }
+};
 
   const handleNext = () => {
     if (validateStep()) {
@@ -271,6 +294,18 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
         // Don't set dates - let the server handle this
       };
       
+      // Add evaluation data if available
+      if (evaluationResults) {
+        ideaData.innovationScore = evaluationResults.innovationScore;
+        ideaData.impactScore = evaluationResults.impactScore;
+        ideaData.alignmentScore = evaluationResults.alignmentScore;
+        ideaData.feasabilityScore = evaluationResults.feasibilityScore; // Note: misspelled as in schema
+        ideaData.innovationExplanation = evaluationResults.innovationExplanation;
+        ideaData.impactExplanation = evaluationResults.impactExplanation;
+        ideaData.alignmentExplanation = evaluationResults.alignmentExplanation;
+        ideaData.feasabilityExplanation = evaluationResults.feasibilityExplanation; // Note: misspelled as in schema
+      }
+      
       // Save to MongoDB
       const result = await apiService.createIdea(ideaData);
       
@@ -316,6 +351,18 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                 status: 'created',
             };
             
+            // Add evaluation data if available
+            if (evaluationResults) {
+                ideaData.innovationScore = evaluationResults.innovationScore;
+                ideaData.impactScore = evaluationResults.impactScore;
+                ideaData.alignmentScore = evaluationResults.alignmentScore;
+                ideaData.feasabilityScore = evaluationResults.feasibilityScore; // Note: misspelled as in schema
+                ideaData.innovationExplanation = evaluationResults.innovationExplanation;
+                ideaData.impactExplanation = evaluationResults.impactExplanation;
+                ideaData.alignmentExplanation = evaluationResults.alignmentExplanation;
+                ideaData.feasabilityExplanation = evaluationResults.feasibilityExplanation; // Note: misspelled as in schema
+            }
+            
             // Save to MongoDB
             const response = await axios.post('http://localhost:3001/idea/create', ideaData);
             
@@ -344,6 +391,24 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
+  };
+
+  // Helper function to get rating label based on score
+  const getRatingLabel = (score) => {
+    if (score >= 85) return 'Excellent';
+    if (score >= 70) return 'Good';
+    if (score >= 50) return 'Average';
+    if (score >= 30) return 'Fair';
+    return 'Poor';
+  };
+  
+  // Helper function to get rating color based on score
+  const getRatingColor = (score) => {
+    if (score >= 85) return 'success';
+    if (score >= 70) return 'primary';
+    if (score >= 50) return 'info';
+    if (score >= 30) return 'warning';
+    return 'error';
   };
 
   const renderBasicInformationStep = () => {
@@ -654,25 +719,25 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
   const renderAIEnhancementStep = () => {
     return (
       <Box>
-        <Typography variant="h6" sx={{ mb: 3 }}>
-          AI Enhancement
+        <Typography variant="h6" sx={{ mb: 3, color: 'primary.main', fontWeight: 600 }}>
+          Step 3: AI Enhancement & Evaluation
         </Typography>
         
         <Alert 
           severity="info" 
           sx={{ mb: 3 }}
         >
-          Our AI assistant will analyze your idea and suggest improvements to enhance its clarity, impact, and alignment with business goals.
+          Our AI assistant will analyze your idea, suggest improvements, and evaluate it across four key criteria: innovation, impact, alignment with business goals, and feasibility.
         </Alert>
         
         {aiLoading ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
             <CircularProgress size={40} />
             <Typography variant="body1" sx={{ mt: 2 }}>
-              Enhancing your idea...
+              Enhancing and evaluating your idea...
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              This may take a few moments
+              This may take a few moments as we thoroughly analyze all aspects of your idea.
             </Typography>
           </Box>
         ) : aiError ? (
@@ -696,50 +761,252 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
         ) : aiEnhancedData ? (
           <Box>
             {/* Original vs Enhanced comparison */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={6}>
-                <Card variant="outlined" sx={{ height: '100%' }}>
-                  <Box sx={{ p: 2, bgcolor: 'grey.100' }}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      Original Description
-                    </Typography>
-                  </Box>
-                  <Box sx={{ p: 2 }}>
-                    <Typography variant="body1">
-                      {formData.description}
-                    </Typography>
-                  </Box>
-                </Card>
+            <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
+              <Typography variant="subtitle1" fontWeight="500" gutterBottom>
+                Description Enhancement
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined" sx={{ height: '100%' }}>
+                    <Box sx={{ p: 2, bgcolor: 'grey.100' }}>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Original Description
+                      </Typography>
+                    </Box>
+                    <Box sx={{ p: 2 }}>
+                      <Typography variant="body1">
+                        {formData.description}
+                      </Typography>
+                    </Box>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined" sx={{ height: '100%', boxShadow: '0 0 5px rgba(0,0,0,0.1)' }}>
+                    <Box sx={{ p: 2, bgcolor: 'primary.light', color: 'white' }}>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Enhanced Description
+                      </Typography>
+                    </Box>
+                    <Box sx={{ p: 2 }}>
+                      <Typography variant="body1" paragraph>
+                        {aiEnhancedData.rewritten || 'No enhancements suggested.'}
+                      </Typography>
+                    </Box>
+                  </Card>
+                </Grid>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <Card variant="outlined" sx={{ height: '100%', boxShadow: '0 0 5px rgba(0,0,0,0.1)' }}>
-                  <Box sx={{ p: 2, bgcolor: 'primary.light', color: 'white' }}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      Enhanced Description
-                    </Typography>
-                  </Box>
-                  <Box sx={{ p: 2 }}>
-                    <Typography variant="body1" paragraph>
-                      {aiEnhancedData.rewritten || 'No enhancements suggested.'}
-                    </Typography>
-                  </Box>
-                </Card>
-              </Grid>
-            </Grid>
+            </Paper>
             
-            {/* AI Evaluation */}
-            <Card variant="outlined" sx={{ mb: 3 }}>
-              <Box sx={{ p: 2, bgcolor: 'info.light', color: 'white' }}>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  AI Evaluation & Feedback
-                </Typography>
-              </Box>
-              <Box sx={{ p: 2 }}>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-                  {aiEnhancedData.evaluation || 'No evaluation provided.'}
-                </Typography>
-              </Box>
-            </Card>
+            {/* AI Evaluation & Feedback */}
+            <Paper variant="outlined" sx={{ p: 3, mb: 3, bgcolor: 'background.paper' }}>
+              <Typography variant="subtitle1" fontWeight="500" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+                <AssessmentIcon sx={{ mr: 1, color: 'primary.main' }} />
+                AI Evaluation & Feedback
+              </Typography>
+              
+              {evaluationResults && (
+                <Box sx={{ mt: 2 }}>
+                  {/* Overall Score Card */}
+                  <Card 
+                    sx={{ 
+                      mb: 3, 
+                      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                      color: 'white'
+                    }}
+                    elevation={3}
+                  >
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Box sx={{ mr: 3, textAlign: 'center' }}>
+                          <Box
+                            sx={{
+                              height: 100,
+                              width: 100,
+                              borderRadius: '50%',
+                              border: '8px solid rgba(255,255,255,0.2)',
+                              position: 'relative',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              '&::after': {
+                                content: '""',
+                                position: 'absolute',
+                                top: -8,
+                                left: -8,
+                                right: -8,
+                                bottom: -8,
+                                borderRadius: '50%',
+                                border: '8px solid transparent',
+                                borderTopColor: 'white',
+                                borderRightColor: 'white',
+                                transform: `rotate(${(evaluationResults ? (evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4 : 0) / 100 * 360}deg)`,
+                                transition: 'all 1s ease-out'
+                              }
+                            }}
+                          >
+                            <Typography variant="h3" fontWeight="bold">
+                              {evaluationResults ? Math.round((evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4) : 0}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+                            Overall Score
+                          </Typography>
+                        </Box>
+                        
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <AssessmentIcon sx={{ mr: 1 }} />
+                            <Typography variant="h6" fontWeight="bold">
+                              {evaluationResults ? getRatingLabel(Math.round((evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4)) : 'Pending'} Evaluation
+                            </Typography>
+                            <Box sx={{ flexGrow: 1 }} />
+                            <Chip 
+                              label={evaluationResults ? getRatingLabel(Math.round((evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4)) : 'Pending'} 
+                              size="small"
+                              sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.2)',
+                                color: 'white',
+                                fontWeight: 'bold'
+                              }}
+                            />
+                          </Box>
+                          
+                          <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
+                            {evaluationResults && Math.round((evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4) >= 85 ? 
+                              'This idea shows exceptional potential across all evaluation criteria. Highly recommended for implementation.' : 
+                             evaluationResults && Math.round((evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4) >= 70 ? 
+                              'This idea demonstrates strong potential and aligns well with organizational goals. Recommended for implementation with minor refinements.' :
+                             evaluationResults && Math.round((evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4) >= 50 ? 
+                              'This idea has potential but requires further development in certain areas before implementation.' :
+                             evaluationResults && Math.round((evaluationResults.innovationScore + evaluationResults.impactScore + evaluationResults.alignmentScore + evaluationResults.feasibilityScore) / 4) >= 30 ? 
+                              'This idea needs significant improvements in multiple areas to meet organizational standards.' :
+                              'This idea requires fundamental reconsideration across most evaluation criteria.'}
+                          </Typography>
+                          
+                          <Box>
+                            {evaluationResults && [
+                              { name: 'Innovation', score: evaluationResults.innovationScore, color: theme.palette.warning.main },
+                              { name: 'Impact', score: evaluationResults.impactScore, color: theme.palette.primary.main },
+                              { name: 'Alignment', score: evaluationResults.alignmentScore, color: theme.palette.info.main },
+                              { name: 'Feasibility', score: evaluationResults.feasibilityScore, color: theme.palette.success.main }
+                            ].map((criterion) => (
+                              <Box key={criterion.name} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                <Typography variant="body2" sx={{ width: 80, fontWeight: 500 }}>
+                                  {criterion.name}:
+                                </Typography>
+                                <Box sx={{ flexGrow: 1, mr: 1 }}>
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={criterion.score}
+                                    sx={{
+                                      height: 6,
+                                      borderRadius: 3,
+                                      backgroundColor: 'rgba(255,255,255,0.2)',
+                                      '& .MuiLinearProgress-bar': {
+                                        backgroundColor: 'white'
+                                      }
+                                    }}
+                                  />
+                                </Box>
+                                <Typography variant="body2" fontWeight="bold" sx={{ minWidth: 30 }}>
+                                  {criterion.score}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Criteria Detail Cards */}
+                  <Grid container spacing={2}>
+                    {evaluationResults && [
+                      { 
+                        name: 'Innovation', 
+                        score: evaluationResults.innovationScore, 
+                        explanation: evaluationResults.innovationExplanation,
+                        icon: <TipsAndUpdatesIcon />,
+                        color: theme.palette.warning.main 
+                      },
+                      { 
+                        name: 'Impact', 
+                        score: evaluationResults.impactScore, 
+                        explanation: evaluationResults.impactExplanation,
+                        icon: <TrendingUpIcon />,
+                        color: theme.palette.primary.main 
+                      },
+                      { 
+                        name: 'Alignment', 
+                        score: evaluationResults.alignmentScore, 
+                        explanation: evaluationResults.alignmentExplanation,
+                        icon: <AlignHorizontalLeftIcon />,
+                        color: theme.palette.info.main 
+                      },
+                      { 
+                        name: 'Feasibility', 
+                        score: evaluationResults.feasibilityScore, 
+                        explanation: evaluationResults.feasibilityExplanation,
+                        icon: <BuildIcon />,
+                        color: theme.palette.success.main 
+                      }
+                    ].map((criterion) => (
+                      <Grid item xs={12} md={6} key={criterion.name}>
+                        <Card variant="outlined" sx={{ height: '100%' }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                              <Box sx={{ 
+                                mr: 1.5,
+                                color: criterion.color,
+                                display: 'flex'
+                              }}>
+                                {criterion.icon}
+                              </Box>
+                              <Typography variant="h6">
+                                {criterion.name}
+                              </Typography>
+                              <Box sx={{ flexGrow: 1 }} />
+                              <Chip 
+                                label={`${criterion.score}% - ${getRatingLabel(criterion.score)}`} 
+                                size="small"
+                                color={getRatingColor(criterion.score)}
+                              />
+                            </Box>
+                            
+                            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                              <Box sx={{ flexGrow: 1, mr: 2 }}>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={criterion.score}
+                                  sx={{
+                                    height: 8,
+                                    borderRadius: 4,
+                                    backgroundColor: 'rgba(0,0,0,0.08)',
+                                    '& .MuiLinearProgress-bar': {
+                                      backgroundColor: criterion.color
+                                    }
+                                  }}
+                                />
+                              </Box>
+                              <Typography variant="h6" fontWeight="bold" color={criterion.color}>
+                                {criterion.score}%
+                              </Typography>
+                            </Box>
+                            
+                            <Divider sx={{ mb: 2 }} />
+                            
+                            <Typography variant="body2">
+                              {criterion.explanation || `No detailed explanation available for the ${criterion.name.toLowerCase()} evaluation.`}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+            </Paper>
             
             {/* Action buttons */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
@@ -766,11 +1033,20 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                   variant="contained" 
                   color="primary"
                   onClick={() => {
-                    // Keep the enhanced version in the form data
+                    // Keep the enhanced version and evaluation results in the form data
                     setFormData(prev => ({
                       ...prev,
                       description: aiEnhancedData.rewritten || prev.description,
-                      aiEnhanced: true
+                      aiEnhanced: true,
+                      // Add evaluation scores to the form data for saving later
+                      innovationScore: evaluationResults?.innovationScore || 0,
+                      impactScore: evaluationResults?.impactScore || 0,
+                      alignmentScore: evaluationResults?.alignmentScore || 0,
+                      feasabilityScore: evaluationResults?.feasibilityScore || 0, // Note: using the misspelled field as in original schema
+                      innovationExplanation: evaluationResults?.innovationExplanation || '',
+                      impactExplanation: evaluationResults?.impactExplanation || '',
+                      alignmentExplanation: evaluationResults?.alignmentExplanation || '',
+                      feasabilityExplanation: evaluationResults?.feasibilityExplanation || '' // Note: using the misspelled field as in original schema
                     }));
                     handleNext();
                   }}
@@ -784,7 +1060,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
             <Typography variant="body1" paragraph align="center">
-              Ready to enhance your idea? Our AI can help make your innovation more impactful.
+              Ready to enhance your idea? Our AI can help make your innovation more impactful and provide a comprehensive evaluation.
             </Typography>
             <Button 
               variant="contained" 
@@ -794,7 +1070,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
               startIcon={<AutoFixHighIcon />}
               sx={{ py: 1, px: 3 }}
             >
-              Enhance My Idea
+              Enhance & Evaluate My Idea
             </Button>
             <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
               You can also skip this step and proceed to review
@@ -808,9 +1084,10 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
   const renderReviewStep = () => {
     return (
       <Box>
-        <Typography variant="h6" gutterBottom>
-          Review Your Idea
+        <Typography variant="h6" sx={{ mb: 3, color: 'primary.main', fontWeight: 600 }}>
+          Step 4: Review & Save
         </Typography>
+        
         <Typography variant="body2" color="text.secondary" paragraph>
           Please review all information below before saving your innovation idea.
         </Typography>
@@ -897,6 +1174,59 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                   {formData.expectedImpact}
                 </Typography>
               </Grid>
+              
+              {evaluationResults && (
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="subtitle2" color="text.secondary">
+                    AI Evaluation Scores
+                  </Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6} sm={3}>
+                        <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Innovation
+                          </Typography>
+                          <Typography variant="h6" color="warning.main" fontWeight="bold">
+                            {evaluationResults.innovationScore}%
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Impact
+                          </Typography>
+                          <Typography variant="h6" color="primary.main" fontWeight="bold">
+                            {evaluationResults.impactScore}%
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Alignment
+                          </Typography>
+                          <Typography variant="h6" color="info.main" fontWeight="bold">
+                            {evaluationResults.alignmentScore}%
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Paper variant="outlined" sx={{ p: 1, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Feasibility
+                          </Typography>
+                          <Typography variant="h6" color="success.main" fontWeight="bold">
+                            {evaluationResults.feasibilityScore}%
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Grid>
+              )}
             </Grid>
           </CardContent>
         </Card>
@@ -906,8 +1236,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
           icon={<HelpOutlineIcon fontSize="inherit" />}
           sx={{ mb: 3 }}
         >
-          You can create your idea now and submit it for approval later. You'll also have the option to
-          request AI enhancement to improve your idea's feasibility, impact, and alignment scores.
+          You can create your idea now and submit it for approval later. The evaluation scores and explanations will be saved with your idea.
         </Alert>
       </Box>
     );

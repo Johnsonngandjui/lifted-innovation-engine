@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const mongoMemoryServer = require('mongodb-memory-server').MongoMemoryServer;
 const mongoose = require('mongoose');
 const cors = require('cors');
-const { mockIdeas } = require('./data/mockDataGavin');
+const { mockIdeas, aiEvaluationPrompts  } = require('./data/mockDataGavin');
 
 require('dotenv').config();
 
@@ -89,6 +89,7 @@ const startMongo = async () => {
         id: ObjectId,
         systemPrompt: String,
         stage: String,
+        promptType: String,
         isDefault: Boolean
     });
 
@@ -116,6 +117,7 @@ You are a useful AI assistant that is being asked to get the result of simple ma
     if (USE_MOCK_DATA) { 
         await ideaModel.insertMany(mockIdeas);
         console.log('Mock data loaded');
+        await promptModel.insertMany(mockIdeas);
      }
     
 };
@@ -429,9 +431,172 @@ app.patch('/idea/:ideaId', async (req, res) => {
     }
 });
 
-// run the server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+app.post('/idea/evaluate', async (req, res) => {
+    try {
+        const { 
+            ideaName,
+            description,
+            authorName,
+            authorDept,
+            tags,
+            problemStatement,
+            audience,
+            expectedImpact,
+            resources
+        } = req.body;
+        
+        // Format the idea description for use in the prompts
+        const ideaDescription = `
+# Innovation Idea Details
 
-startMongo();
+## Basic Information
+Title: ${ideaName || 'Untitled Idea'}
+Created by: ${authorName || 'Anonymous'}
+Department: ${authorDept || 'Not specified'}
+Tags: ${tags && tags.length > 0 ? tags.join(', ') : 'None'}
+
+## Description
+${description || 'No description provided'}
+
+## Problem Statement
+${problemStatement || 'No problem statement provided'}
+
+## Target Audience
+${audience || 'Not specified'}
+
+## Expected Impact
+${expectedImpact || 'Not specified'}
+
+## Resources Needed
+${resources || 'Not specified'}
+`;
+
+        // Get all evaluation prompts from the database
+        const evaluationPrompts = await promptModel.find({ 
+            promptType: { $in: ['innovation', 'impact', 'alignment', 'feasibility'] },
+            isDefault: true
+        });
+
+        if (!evaluationPrompts || evaluationPrompts.length === 0) {
+            throw new Error('Evaluation prompts not found in database');
+        }
+
+        // Create a map of prompt types to their content
+        const promptMap = {};
+        evaluationPrompts.forEach(prompt => {
+            promptMap[prompt.promptType] = prompt.systemPrompt.replace('{IDEA_DESCRIPTION}', ideaDescription);
+        });
+
+        // Make OpenAI API calls for each evaluation type
+        const [innovationResponse, impactResponse, alignmentResponse, feasibilityResponse] = await Promise.all([
+            makeOpenAIRequest([
+                { role: "system", content: promptMap.innovation },
+                { role: "user", content: "Please evaluate the innovation level of this idea." }
+            ]),
+            makeOpenAIRequest([
+                { role: "system", content: promptMap.impact },
+                { role: "user", content: "Please evaluate the potential impact of this idea." }
+            ]),
+            makeOpenAIRequest([
+                { role: "system", content: promptMap.alignment },
+                { role: "user", content: "Please evaluate the alignment of this idea with organizational goals." }
+            ]),
+            makeOpenAIRequest([
+                { role: "system", content: promptMap.feasibility },
+                { role: "user", content: "Please evaluate the feasibility of implementing this idea." }
+            ])
+        ]);
+
+        // Parse the JSON responses
+        const parseResponse = (response) => {
+            try {
+                return JSON.parse(response.choices[0].message.content);
+            } catch (error) {
+                console.error(`Error parsing response:`, error);
+                return { score: 50, explanation: "Error parsing AI evaluation response." };
+            }
+        };
+
+        const innovationResult = parseResponse(innovationResponse);
+        const impactResult = parseResponse(impactResponse);
+        const alignmentResult = parseResponse(alignmentResponse);
+        const feasibilityResult = parseResponse(feasibilityResponse);
+
+        // Calculate overall score (average of all scores)
+        const overallScore = Math.round(
+            (innovationResult.score + impactResult.score + alignmentResult.score + feasibilityResult.score) / 4
+        );
+
+        // Prepare the evaluation results
+        const evaluationResults = {
+            innovationScore: innovationResult.score,
+            impactScore: impactResult.score,
+            alignmentScore: alignmentResult.score,
+            feasibilityScore: feasibilityResult.score,
+            innovationExplanation: innovationResult.explanation,
+            impactExplanation: impactResult.explanation,
+            alignmentExplanation: alignmentResult.explanation,
+            feasibilityExplanation: feasibilityResult.explanation,
+            overallScore
+        };
+
+        // Return the evaluation results
+        res.status(200).json(evaluationResults);
+
+    } catch (error) {
+        console.error('Error evaluating idea:', error);
+        res.status(500).json({ 
+            error: 'Error evaluating idea',
+            message: error.message 
+        });
+    }
+});
+const loadEvaluationPrompts = async () => {
+    try {
+        // Check if prompts already exist
+        const existingPrompts = await promptModel.find({
+            promptType: { $in: ['innovation', 'impact', 'alignment', 'feasibility'] }
+        });
+
+        if (existingPrompts.length === 0) {
+            // Insert the evaluation prompts
+            await promptModel.insertMany([
+                {
+                    systemPrompt: aiEvaluationPrompts.innovation,
+                    promptType: 'innovation',
+                    isDefault: true
+                },
+                {
+                    systemPrompt: aiEvaluationPrompts.impact,
+                    promptType: 'impact',
+                    isDefault: true
+                },
+                {
+                    systemPrompt: aiEvaluationPrompts.alignment,
+                    promptType: 'alignment',
+                    isDefault: true
+                },
+                {
+                    systemPrompt: aiEvaluationPrompts.feasibility,
+                    promptType: 'feasibility',
+                    isDefault: true
+                }
+            ]);
+            console.log('AI evaluation prompts loaded into database');
+        }
+    } catch (error) {
+        console.error('Error loading evaluation prompts:', error);
+    }
+};
+
+// Call this function after starting MongoDB
+const startServer = async () => {
+    await startMongo();
+    await loadEvaluationPrompts();
+    
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+};
+
+startServer();
