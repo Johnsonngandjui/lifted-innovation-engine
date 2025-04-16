@@ -21,69 +21,57 @@ import SearchIcon from '@mui/icons-material/Search';
 import InputAdornment from '@mui/material/InputAdornment';
 import CommentIcon from '@mui/icons-material/Comment';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import axios from 'axios';
 
 const IdeaList = () => {
     const navigate = useNavigate();
-
     const [expandedId, setExpandedId] = useState(null);
-    const [status, setStatus] = React.useState('all');
-    const [department, setDepartment] = React.useState('all');
+    const [status, setStatus] = useState('all');
+    const [department, setDepartment] = useState('all');
     const [searchText, setSearchText] = useState('');
+    const [ideas, setIdeas] = useState([]);
     const [filteredIdeas, setFilteredIdeas] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch ideas from API
+    useEffect(() => {
+        const fetchIdeas = async () => {
+            try {
+                const response = await axios.get('http://localhost:3001/ideas');
+                setIdeas(response.data);
+                setLoading(false);
+            } catch (error) {
+                console.error('Error fetching ideas:', error);
+                setLoading(false);
+            }
+        };
+        
+        fetchIdeas();
+    }, []);
+
+    // Filter ideas based on search criteria
+    useEffect(() => {
+        if (!ideas) return;
+        
+        const filtered = ideas.filter(idea => {
+            const matchesSearch = idea.ideaName.toLowerCase().includes(searchText.toLowerCase()) ||
+                idea.authorName.toLowerCase().includes(searchText.toLowerCase());
+            const matchesStatus = status === 'all' || 
+                (status === 'in_progress' ? idea.status === 'In Progress' : 
+                 status === 'evaluation' ? idea.status === 'Evaluation' : 
+                 status === 'approved' ? idea.status === 'Approved' : true);
+            const matchesDepartment = department === 'all' || idea.authorDept === department;
+
+            return matchesSearch && matchesStatus && matchesDepartment;
+        });
+
+        setFilteredIdeas(filtered);
+    }, [searchText, status, department, ideas]);
 
     const handleViewDetails = (ideaId, e) => {
         e.stopPropagation();
         navigate(`/ideas/${ideaId}`);
     };
-
-    // Mock data - replace with actual data
-    const ideas = [
-        {
-            id: 1,
-            title: "AI-Powered Customer Service Platform",
-            author: "John Smith",
-            department: "Technology",
-            createdAt: "2024-01-15",
-            status: "In Progress",
-            description: "An AI platform that can handle customer inquiries 24/7, using natural language processing to provide accurate responses and escalate complex issues to human agents when necessary.",
-            aiEvaluation: {
-                feasibility: 85,
-                impact: 92,
-                alignment: 78,
-                progress: 45
-            }
-        },
-        {
-            id: 2,
-            title: "Sustainable Packaging Initiative",
-            author: "Sarah Johnson",
-            department: "Operations",
-            createdAt: "2024-01-14",
-            status: "Evaluation",
-            description: "An AI platform that can handle customer inquiries 24/7, using natural language processing to provide accurate responses and escalate complex issues to human agents when necessary.",
-            aiEvaluation: {
-                feasibility: 85,
-                impact: 92,
-                alignment: 78,
-                progress: 45
-            }
-        },
-        {
-            id: 3,
-            title: "Employee Wellness Program",
-            author: "Mike Wilson",
-            department: "HR",
-            createdAt: "2024-01-13",
-            status: "Approved",
-            description: "An AI platform that can handle customer inquiries 24/7, using natural language processing to provide accurate responses and escalate complex issues to human agents when necessary.",
-            aiEvaluation: {
-                feasibility: 85,
-                impact: 92,
-                alignment: 78,
-                progress: 45
-            }
-        },
-    ];
 
     const ScoreBar = ({ label, value }) => (
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -198,14 +186,14 @@ const IdeaList = () => {
                 {filteredIdeas.length > 0 ? (
                     filteredIdeas.map((idea) => (
                         <Card
-                            key={idea.id}
+                            key={idea._id}
                             sx={{
                                 mb: 2,
                                 boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                                 '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.12)' },
                                 cursor: 'pointer'
                             }}
-                            onClick={() => setExpandedId(expandedId === idea.id ? null : idea.id)}
+                            onClick={() => setExpandedId(expandedId === idea._id ? null : idea._id)}
                         >
                             <CardContent sx={{
                                 display: 'flex',
@@ -215,10 +203,10 @@ const IdeaList = () => {
                             }}>
                                 <Box>
                                     <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                                        {idea.title}
+                                        {idea.ideaName}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                        Submitted by {idea.author} ({idea.department}) • {new Date(idea.createdAt).toLocaleDateString()}
+                                        Submitted by {idea.authorName} ({idea.authorDept}) • {new Date(idea.createdAt).toLocaleDateString()}
                                     </Typography>
                                 </Box>
                                 <Chip
@@ -229,7 +217,7 @@ const IdeaList = () => {
                                 />
                             </CardContent>
 
-                            <Collapse in={expandedId === idea.id}>
+                            <Collapse in={expandedId === idea._id}>
                                 <CardContent sx={{ pt: 0, px: 2.5, pb: 2.5 }}>
                                     <Box sx={{ mb: 2 }}>
                                         <Typography variant="body1" paragraph>
@@ -241,10 +229,10 @@ const IdeaList = () => {
                                         AI Evaluation
                                     </Typography>
                                     <Box sx={{ mt: 1.5 }}>
-                                        <ScoreBar label="Feasibility" value={idea.aiEvaluation.feasibility} />
-                                        <ScoreBar label="Impact" value={idea.aiEvaluation.impact} />
-                                        <ScoreBar label="Alignment" value={idea.aiEvaluation.alignment} />
-                                        <ScoreBar label="Progress" value={idea.aiEvaluation.progress} />
+                                        <ScoreBar label="Innovation" value={idea.innovationScore || 0} />
+                                        <ScoreBar label="Impact" value={idea.impactScore || 0} />
+                                        <ScoreBar label="Alignment" value={idea.alignmentScore || 0} />
+                                        <ScoreBar label="Feasability" value={idea.feasabilityScore || 0} />
                                     </Box>
                                     <Stack
                                         direction="row"
@@ -271,7 +259,7 @@ const IdeaList = () => {
                                             variant="contained"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleViewDetails(idea.id, e)
+                                                handleViewDetails(idea._id, e)
                                             }}
                                         >
                                             View Details

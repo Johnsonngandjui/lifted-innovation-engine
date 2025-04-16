@@ -1,6 +1,5 @@
-// pages/Dashboard.js - Complete Restructuring for Better Fit
-import React, { useContext } from 'react';
-import { AppContext } from '../contexts/AppContext';
+// pages/Dashboard.js - Refactored to use API directly
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Box,
@@ -44,6 +43,11 @@ import SchoolIcon from '@mui/icons-material/School';
 import GroupsIcon from '@mui/icons-material/Groups';
 import CorporateFareIcon from '@mui/icons-material/CorporateFare';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+
+// Import API service instead of using context
+import apiService from '../services/apiService';
+// Import mock data for departments and status options
+import { departments, statusOptions } from '../data/mockData';
 
 // Simple Stat Card - Redesigned for better space utilization
 const StatCard = ({ icon, title, value, subtitle, trend, color }) => {
@@ -101,13 +105,17 @@ const StatCard = ({ icon, title, value, subtitle, trend, color }) => {
 const IdeaCard = ({ idea }) => {
   const theme = useTheme();
 
-  // Determine status color
+  // Determine status color - normalize case
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed': return theme.palette.success.main;
-      case 'In Progress': return theme.palette.primary.main;
-      case 'Approved': return theme.palette.info.main;
-      case 'Evaluation': return theme.palette.warning.main;
+    if (!status) return theme.palette.grey[500];
+    
+    const normalizedStatus = status.toLowerCase();
+    
+    switch (normalizedStatus) {
+      case 'completed': return theme.palette.success.main;
+      case 'in progress': return theme.palette.primary.main;
+      case 'approved': return theme.palette.info.main;
+      case 'evaluation': return theme.palette.warning.main;
       default: return theme.palette.grey[500];
     }
   };
@@ -117,15 +125,26 @@ const IdeaCard = ({ idea }) => {
     if (!text) return '';
     return text.length > length ? text.substring(0, length) + '...' : text;
   };
+  
+  // Format date with fallbacks
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'Unknown';
+    try {
+      return new Date(dateStr).toLocaleDateString();
+    } catch (error) {
+      console.error('Date format error:', error);
+      return 'Unknown';
+    }
+  };
 
   return (
     <Box sx={{ mb: 2, pb: 2, borderBottom: `1px solid ${theme.palette.divider}` }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
         <Typography variant="subtitle2" fontWeight="600">
-          {truncate(idea.title, 40)}
+          {truncate(idea.title || idea.ideaName || 'Untitled Idea', 40)}
         </Typography>
         <Chip
-          label={idea.status}
+          label={idea.status || 'Unknown'}
           size="small"
           sx={{
             backgroundColor: getStatusColor(idea.status) + '15',
@@ -142,7 +161,7 @@ const IdeaCard = ({ idea }) => {
         color="text.secondary"
         sx={{ mb: 1, fontSize: '0.8rem' }}
       >
-        {truncate(idea.description, 100)}
+        {truncate(idea.description || 'No description provided', 100)}
       </Typography>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -155,18 +174,18 @@ const IdeaCard = ({ idea }) => {
               bgcolor: theme.palette.primary.light
             }}
           >
-            {idea.submittedBy.charAt(0)}
+            {(idea.submittedBy || idea.authorName || '?').charAt(0).toUpperCase()}
           </Avatar>
           <Typography variant="caption" color="text.secondary" sx={{ ml: 0.75, fontSize: '0.7rem' }}>
-            {idea.submittedBy}
+            {idea.submittedBy || idea.authorName || 'Unknown User'}
           </Typography>
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-          {idea.dateSubmitted}
+          {formatDate(idea.dateSubmitted || idea.createdAt)}
         </Typography>
       </Box>
 
-      {idea.progress > 0 && (
+      {(idea.progress !== undefined && idea.progress > 0) && (
         <LinearProgress
           variant="determinate"
           value={idea.progress}
@@ -183,10 +202,112 @@ const IdeaCard = ({ idea }) => {
 };
 
 const Dashboard = () => {
-  const { ideas, getStats } = useContext(AppContext);
   const theme = useTheme();
+  const [ideas, setIdeas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    totalIdeas: 0,
+    statusCounts: {},
+    departmentCounts: {},
+    avgScores: {
+      innovation: 0,
+      impact: 0,
+      alignment: 0,
+      feasibility: 0,
+      overall: 0
+    }
+  });
 
-  const stats = getStats();
+  // Fetch ideas directly from API
+  useEffect(() => {
+    const fetchIdeas = async () => {
+      try {
+        setLoading(true);
+        const fetchedIdeas = await apiService.getAllIdeas();
+        setIdeas(fetchedIdeas);
+        
+        // Calculate stats after fetching ideas
+        calculateStats(fetchedIdeas);
+        
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching ideas:', err);
+        setError('Failed to load ideas. Please try again later.');
+        setIdeas([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIdeas();
+  }, []);
+
+  // Calculate stats using the same logic from the original context
+  const calculateStats = (ideasData) => {
+    const totalIdeas = ideasData.length;
+    
+    // Initialize status counts with all possible statuses set to 0
+    const statusCounts = {};
+    statusOptions.forEach(status => {
+      // Make status check case-insensitive
+      statusCounts[status] = ideasData.filter(idea => 
+        idea.status && idea.status.toLowerCase() === status.toLowerCase()
+      ).length;
+    });
+    
+    // Initialize department counts with all departments set to 0
+    const departmentCounts = {};
+    departments.forEach(dept => {
+      departmentCounts[dept] = ideasData.filter(idea => 
+        (idea.authorDept && idea.authorDept === dept) || 
+        (idea.department && idea.department === dept)
+      ).length;
+    });
+    
+    // Calculate average scores
+    let avgInnovation = 0;
+    let avgImpact = 0;
+    let avgAlignment = 0;
+    let avgFeasibility = 0;
+    
+    // Filter ideas that have scores
+    let scoredIdeas = ideasData.filter(idea => 
+      (idea.innovationScore !== undefined || idea.innovationScore !== null) && 
+      (idea.impactScore !== undefined || idea.impactScore !== null)
+    );
+    
+    if (scoredIdeas.length > 0) {
+      avgInnovation = scoredIdeas.reduce((sum, idea) => 
+        sum + (idea.innovationScore || 0), 0) / scoredIdeas.length;
+      
+      avgImpact = scoredIdeas.reduce((sum, idea) => 
+        sum + (idea.impactScore || 0), 0) / scoredIdeas.length;
+      
+      avgAlignment = scoredIdeas.reduce((sum, idea) => 
+        sum + (idea.alignmentScore || 0), 0) / scoredIdeas.length;
+      
+      // Handle both spellings of feasibility
+      avgFeasibility = scoredIdeas.reduce((sum, idea) => 
+        sum + (idea.feasibilityScore || idea.feasabilityScore || 0), 0) / scoredIdeas.length;
+    }
+    
+    // Log the status counts to verify data
+    console.log('Status counts:', statusCounts);
+    
+    setStats({
+      totalIdeas,
+      statusCounts,
+      departmentCounts,
+      avgScores: {
+        innovation: Math.round(avgInnovation) || 0,
+        impact: Math.round(avgImpact) || 0,
+        alignment: Math.round(avgAlignment) || 0,
+        feasibility: Math.round(avgFeasibility) || 0,
+        overall: Math.round((avgInnovation + avgImpact + avgAlignment + avgFeasibility) / 4) || 0
+      }
+    });
+  };
 
   // Custom colors for charts
   const statusColors = [
@@ -197,10 +318,32 @@ const Dashboard = () => {
   ];
 
   // Prepare data for status pie chart
-  const statusData = Object.keys(stats.statusCounts).map(status => ({
-    name: status,
-    value: stats.statusCounts[status]
-  })).filter(item => item.value > 0);
+  const statusData = statusOptions.map(status => {
+    const count = stats.statusCounts[status] || 0;
+    return {
+      name: status,
+      value: count
+    };
+  }).filter(item => item.value > 0);
+  
+  // If no status data exists, provide dummy data for display purposes
+  if (statusData.length === 0 && ideas.length > 0) {
+    // If we have ideas but no status data matched our statusOptions,
+    // create a single "Other" category to show in the chart
+    statusData.push({
+      name: 'Other',
+      value: ideas.length
+    });
+  } else if (statusData.length === 0) {
+    // If no ideas at all, add dummy data to show the chart structure
+    statusData.push({
+      name: 'No Ideas',
+      value: 1
+    });
+  }
+  
+  // Debug log to check status data
+  console.log('Prepared status data for chart:', statusData);
 
   // Prepare data for department bar chart
   const deptData = Object.keys(stats.departmentCounts)
@@ -236,6 +379,24 @@ const Dashboard = () => {
       </text>
     );
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+        <Typography>Loading dashboard data...</Typography>
+      </Box>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -276,7 +437,7 @@ const Dashboard = () => {
             icon={<BuildIcon sx={{ color: '#fff' }} />}
             title="In Progress"
             value={stats.statusCounts['In Progress'] || 0}
-            subtitle={`${Math.round((stats.statusCounts['In Progress'] || 0) / stats.totalIdeas * 100)}% of total`}
+            subtitle={`${Math.round((stats.statusCounts['In Progress'] || 0) / stats.totalIdeas * 100) || 0}% of total`}
             color={theme.palette.info.main}
           />
         </Grid>
@@ -325,32 +486,41 @@ const Dashboard = () => {
                   <Box sx={{ height: 200, width: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie
-                          data={statusData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={70}
-                          paddingAngle={1}
-                          dataKey="value"
-                          labelLine={false}
-                          label={renderCustomizedLabel}
-                        >
-                          {statusData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={statusColors[index % statusColors.length]}
+                        {statusData.length > 0 ? (
+                          <>
+                            <Pie
+                              data={statusData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={40}
+                              outerRadius={70}
+                              paddingAngle={1}
+                              dataKey="value"
+                              nameKey="name"
+                              labelLine={false}
+                              label={renderCustomizedLabel}
+                            >
+                              {statusData.map((entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={statusColors[index % statusColors.length]}
+                                />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip formatter={(value, name) => [`${value} ideas`, name]} />
+                            <Legend
+                              layout="horizontal"
+                              verticalAlign="bottom"
+                              align="center"
+                              iconSize={10}
+                              iconType="circle"
                             />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip formatter={(value) => [`${value} ideas`, 'Count']} />
-                        <Legend
-                          layout="horizontal"
-                          verticalAlign="bottom"
-                          align="center"
-                          iconSize={10}
-                          iconType="circle"
-                        />
+                          </>
+                        ) : (
+                          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">
+                            No status data available
+                          </text>
+                        )}
                       </PieChart>
                     </ResponsiveContainer>
                   </Box>
@@ -382,9 +552,17 @@ const Dashboard = () => {
 
                   <Box sx={{ maxHeight: 220, overflow: 'auto', pr: 1 }}>
                     {ideas.length > 0 ? (
-                      ideas.slice(-3).reverse().map((idea) => (
-                        <IdeaCard key={idea.id} idea={idea} />
-                      ))
+                      // Sort by date and get the most recent 3 ideas
+                      [...ideas]
+                        .sort((a, b) => {
+                          const dateA = new Date(a.createdAt || a.lastUpdated || 0);
+                          const dateB = new Date(b.createdAt || b.lastUpdated || 0);
+                          return dateB - dateA;
+                        })
+                        .slice(0, 3)
+                        .map((idea) => (
+                          <IdeaCard key={idea._id || idea.id} idea={idea} />
+                        ))
                     ) : (
                       <Box
                         sx={{
@@ -410,7 +588,7 @@ const Dashboard = () => {
                           color="primary"
                           startIcon={<AddIcon />}
                           component={Link}
-                          to="/submit"
+                          to="/create"
                           sx={{ mt: 1.5, py: 0.5 }}
                           size="small"
                         >

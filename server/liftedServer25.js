@@ -360,13 +360,19 @@ app.get('/ideas/:userId', async (req, res) => {
 app.get('/idea/:ideaId', async (req, res) => {
     const { ideaId } = req.params;
     try {
-        const idea = await ideaModel.findOne({ ideaId: ideaId });
+        // Use _id instead of ideaId, and convert the string id to ObjectId
+        const idea = await ideaModel.findOne({ _id: ideaId });
+        if (!idea) {
+            return res.status(404).send({ message: 'Idea not found' });
+        }
         res.send(idea);
-    } catch {
-        res.status(404).send({ message: 'Idea not found' });
+    } catch (error) {
+        console.error('Error fetching idea:', error);
+        res.status(404).send({ message: 'Idea not found', error: error.message });
     }
 });
 
+//post create new idea
 //post create new idea
 //post create new idea
 app.post('/idea/create', async (req, res) => {
@@ -374,14 +380,14 @@ app.post('/idea/create', async (req, res) => {
         // Create a new idea document
         const newIdea = new ideaModel({
             ideaName: req.body.ideaName,
-            authorId: req.body.authorId, //n-num
+            authorId: req.body.authorId,
             authorName: req.body.authorName,
             authorDept: req.body.authorDept,
-            public: req.body.public || true, // Default to true if not provided
+            public: req.body.public || true,
             createdAt: new Date(),
             lastUpdated: new Date(),
             description: req.body.description,
-            status: req.body.status || "created", // Use status field instead of latestStage
+            status: req.body.status || "created",
             problemStatement: req.body.problemStatement,
             audience: req.body.audience,
             expectedImpact: req.body.expectedImpact,
@@ -398,9 +404,9 @@ app.post('/idea/create', async (req, res) => {
         res.status(201).json(savedIdea);
     } catch (error) { 
         console.error('Error creating idea:', error);
-        res.status(400).send({ 
+        res.status(400).json({ 
             message: 'Error creating idea', 
-            error: error.message || error 
+            error: error.message 
         });
     }
 });

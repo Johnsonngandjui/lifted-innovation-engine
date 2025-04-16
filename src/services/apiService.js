@@ -1,138 +1,158 @@
-// src/services/apiService.js
-import axios from 'axios';
-
+// services/apiService.js
 const API_BASE_URL = 'http://localhost:3001';
 
 /**
- * Service to handle all API calls to the backend
+ * Service for handling all API calls to the backend
  */
 const apiService = {
   /**
-   * Get all ideas
-   * @returns {Promise} Promise with ideas data
+   * Fetch all ideas from the database
+   * @returns {Promise<Array>} Array of idea objects
    */
-  getAllIdeas: async () => {
+  async getAllIdeas() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ideas`);
-      return response.data;
+      const response = await fetch(`${API_BASE_URL}/ideas`);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
     } catch (error) {
-      console.error('Error fetching ideas:', error);
+      console.error('Error fetching all ideas:', error);
       throw error;
     }
   },
-
+  
   /**
-   * Get ideas for a specific user
-   * @param {string} userId - User ID
-   * @returns {Promise} Promise with user's ideas data
+   * Fetch ideas for a specific user
+   * @param {string} userId - The user ID to fetch ideas for
+   * @returns {Promise<Array>} Array of idea objects
    */
-  getUserIdeas: async (userId) => {
+  async getUserIdeas(userId) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/ideas/${userId}`);
-      return response.data;
+      const response = await fetch(`${API_BASE_URL}/ideas/${userId}`);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error(`Error fetching ideas for user ${userId}:`, error);
       throw error;
     }
   },
-
+  
   /**
-   * Get a specific idea
-   * @param {string} ideaId - Idea ID
-   * @returns {Promise} Promise with idea data
+   * Fetch a specific idea by ID
+   * @param {string} ideaId - The idea ID to fetch
+   * @returns {Promise<Object>} The idea object
    */
-  getIdea: async (ideaId) => {
+  async getIdea(ideaId) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/idea/${ideaId}`);
-      return response.data;
+      const response = await fetch(`${API_BASE_URL}/idea/${ideaId}`);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error(`Error fetching idea ${ideaId}:`, error);
       throw error;
     }
   },
-
-
+  
   /**
    * Create a new idea
-   * @param {Object} ideaData - New idea data
-   * @returns {Promise} Promise with creation result
+   * @param {Object} ideaData - The idea data to create
+   * @returns {Promise<Object>} The created idea object
    */
-  createIdea: async (ideaData) => {
+  async createIdea(ideaData) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/idea/create`, ideaData);
-
-      // The server now returns the complete saved idea with MongoDB-generated ID
-      return response.data;
+      const response = await fetch(`${API_BASE_URL}/idea/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ideaData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error('Error creating idea:', error);
       throw error;
     }
   },
-
+  
   /**
    * Update an existing idea
-   * @param {string} ideaId - Idea ID to update
-   * @param {Object} updateData - Data to update
-   * @returns {Promise} Promise with updated idea data
+   * @param {string} ideaId - The ID of the idea to update
+   * @param {Object} updateData - The data to update
+   * @returns {Promise<Object>} The updated idea object
    */
-  updateIdea: async (ideaId, updateData) => {
+  async updateIdea(ideaId, updateData) {
     try {
-      const response = await axios.patch(`${API_BASE_URL}/idea/${ideaId}`, updateData);
-      return response.data;
+      const response = await fetch(`${API_BASE_URL}/idea/${ideaId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
     } catch (error) {
       console.error(`Error updating idea ${ideaId}:`, error);
       throw error;
     }
   },
-
+  
   /**
-   * Enhance idea with AI
-   * @param {Object} ideaData - Idea data to enhance
-   * @returns {Promise} Promise with AI enhancement result
+   * Enhance an idea with AI
+   * @param {Object} idea - The idea to enhance
+   * @returns {Promise<Object>} The enhanced idea
    */
-  enhanceIdeaWithAI: async (ideaData) => {
+  async enhanceIdeaWithAI(idea) {
     try {
-      // Format all the idea information in a clear structure
-      const ideaText = `
-# Innovation Idea Details
-
-## Basic Information
-Title: ${ideaData.ideaName || ideaData.title}
-Created by: ${ideaData.authorName || ideaData.submittedBy}
-Department: ${ideaData.authorDept || ideaData.department}
-Tags: ${ideaData.tags && ideaData.tags.length > 0 ? ideaData.tags.join(', ') : 'None'}
-
-## Description
-${ideaData.description}
-
-## Problem Statement
-${ideaData.problemStatement}
-
-## Target Audience
-${ideaData.audience || ideaData.targetAudience || 'Not specified'}
-
-## Expected Impact
-${ideaData.expectedImpact}
-
-## Resources Needed
-${ideaData.resources || ideaData.resourcesNeeded || 'Not specified'}
-
-Please enhance this innovation idea to make it more compelling, impactful, and business-oriented. Maintain the core concept but improve clarity and presentation.
-`;
-
-      const response = await axios.post(`${API_BASE_URL}/gpt`, {
-        message: ideaText,
-        type: 'idea_enhancement',
-        context: {
-          stage: 'enhancement',
-          ideaMetadata: {
-            department: ideaData.authorDept || ideaData.department,
-            tags: ideaData.tags
+      const response = await fetch(`${API_BASE_URL}/gpt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'idea_enhancement',
+          message: idea.description,
+          context: {
+            ideaMetadata: {
+              department: idea.authorDept || idea.department,
+              title: idea.ideaName || idea.title,
+              author: idea.authorName
+            }
           }
-        }
+        }),
       });
-
-      return response.data.response;
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data.response;
     } catch (error) {
       console.error('Error enhancing idea with AI:', error);
       throw error;

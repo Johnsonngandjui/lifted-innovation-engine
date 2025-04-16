@@ -307,49 +307,40 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
 
   const handleSaveIdea = async () => {
     if (validateStep()) {
-      setLoading(true);
-      
-      try {
-        // Prepare data for MongoDB
-        const ideaData = {
-          ...formData,
-          status: 'created', // Status is "created" but not yet submitted
-        };
+        setLoading(true);
         
-        // Save to MongoDB
-        const result = await apiService.createIdea(ideaData);
-        
-        if (result && (result._id || result.id)) {
-          // Show success message
-          setSnackbarMessage('Idea created successfully');
-          setSnackbarSeverity('success');
-          setSnackbarOpen(true);
-          
-          // Also update local state using the AppContext function
-          const newIdea = addIdea({
-            ...formData,
-            ...result, // Include all fields from the server response, including the _id
-            status: 'Created'
-          });
-          
-          // Redirect to the idea detail page using the MongoDB-generated _id
-          setTimeout(() => {
-            navigate(`/ideas/${result._id || result.id}`);
-          }, 1500);
-        } else {
-          throw new Error('Server did not return a valid idea ID');
+        try {
+            // Prepare data for MongoDB
+            const ideaData = {
+                ...formData,
+                status: 'created',
+            };
+            
+            // Save to MongoDB
+            const response = await axios.post('http://localhost:3001/idea/create', ideaData);
+            
+            if (response.data && response.data._id) {
+                setSnackbarMessage('Idea created successfully');
+                setSnackbarSeverity('success');
+                setSnackbarOpen(true);
+                
+                // Redirect to the idea detail page
+                setTimeout(() => {
+                    navigate(`/ideas/${response.data._id}`);
+                }, 1500);
+            } else {
+                throw new Error('Server did not return a valid idea ID');
+            }
+        } catch (error) {
+            console.error('Error creating idea:', error);
+            setSnackbarMessage('Error creating idea: ' + (error.message || 'Please try again'));
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+        } finally {
+            setLoading(false);
         }
-      } catch (error) {
-        // Handle errors
-        console.error('Error creating idea:', error);
-        setSnackbarMessage('Error creating idea: ' + (error.message || 'Please try again'));
-        setSnackbarSeverity('error');
-        setSnackbarOpen(true);
-      } finally {
-        setLoading(false);
-      }
     }
-  };
+};
 
   const handleCloseSnackbar = () => {
     setSnackbarOpen(false);
