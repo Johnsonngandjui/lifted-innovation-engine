@@ -1,4 +1,4 @@
-// pages/CreateIdea.js - New Idea Creation Flow with Draft/Save functionality
+// pages/CreateIdea.js - New Idea Creation Flow with MongoDB integration
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../contexts/AppContext';
@@ -27,7 +27,9 @@ import {
   Divider,
   useTheme,
   CardContent,
-  Snackbar
+  Snackbar,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 
 // Icons
@@ -48,6 +50,7 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckIcon from '@mui/icons-material/Check';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import apiService from '../services/apiService'
 
 const CreateIdea = () => {
   const { addIdea, departments } = useContext(AppContext);
@@ -58,18 +61,23 @@ const CreateIdea = () => {
   const [loading, setLoading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   
   const [formData, setFormData] = useState({
-    title: '',
+    ideaName: '',               // Using ideaName instead of title to match schema
     description: '',
-    submittedBy: '',
-    department: '',
+    authorName: '',             // Using authorName instead of submittedBy to match schema
+    authorId: 'n' + Math.floor(Math.random() * 10000000), // Generate a mock n-number ID
+    authorDept: '',             // Using authorDept instead of department to match schema
     tags: [],
     problemStatement: '',
-    targetAudience: '',
+    audience: '',               // Using audience instead of targetAudience to match schema
     expectedImpact: '',
-    resourcesNeeded: '',
-    status: 'Draft' // Default status is Draft
+    resources: '',              // Using resources instead of resourcesNeeded to match schema
+    public: true,               // Default to public
+    status: 'Draft',            // Default status is Draft
+    editors: [],                // Initialize empty editors array
+    likes: 0                    // Initialize with 0 likes
   });
   
   const [errors, setErrors] = useState({});
@@ -82,7 +90,15 @@ const CreateIdea = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    // Map form field names to schema field names if needed
+    let fieldName = name;
+    if (name === 'title') fieldName = 'ideaName';
+    if (name === 'submittedBy') fieldName = 'authorName';
+    if (name === 'department') fieldName = 'authorDept';
+    if (name === 'targetAudience') fieldName = 'audience';
+    if (name === 'resourcesNeeded') fieldName = 'resources';
+    
+    setFormData({ ...formData, [fieldName]: value });
     
     // Clear error for the field being updated
     if (errors[name]) {
@@ -125,10 +141,10 @@ const CreateIdea = () => {
     const newErrors = {};
     
     if (activeStep === 0) {
-      if (!formData.title.trim()) newErrors.title = 'Title is required';
+      if (!formData.ideaName.trim()) newErrors.title = 'Title is required';
       if (!formData.description.trim()) newErrors.description = 'Description is required';
-      if (!formData.submittedBy.trim()) newErrors.submittedBy = 'Your name is required';
-      if (!formData.department) newErrors.department = 'Department is required';
+      if (!formData.authorName.trim()) newErrors.submittedBy = 'Your name is required';
+      if (!formData.authorDept) newErrors.department = 'Department is required';
     } else if (activeStep === 1) {
       if (!formData.problemStatement.trim()) newErrors.problemStatement = 'Problem statement is required';
       if (!formData.expectedImpact.trim()) newErrors.expectedImpact = 'Expected impact is required';
@@ -148,9 +164,9 @@ const CreateIdea = () => {
 # Innovation Idea Details
 
 ## Basic Information
-Title: ${formData.title}
-Created by: ${formData.submittedBy}
-Department: ${formData.department}
+Title: ${formData.ideaName}
+Created by: ${formData.authorName}
+Department: ${formData.authorDept}
 Tags: ${formData.tags.length > 0 ? formData.tags.join(', ') : 'None'}
 
 ## Description
@@ -160,13 +176,13 @@ ${formData.description}
 ${formData.problemStatement}
 
 ## Target Audience
-${formData.targetAudience || 'Not specified'}
+${formData.audience || 'Not specified'}
 
 ## Expected Impact
 ${formData.expectedImpact}
 
 ## Resources Needed
-${formData.resourcesNeeded || 'Not specified'}
+${formData.resources || 'Not specified'}
 
 Please enhance this innovation idea to make it more compelling, impactful, and business-oriented. Maintain the core concept but improve clarity and presentation only use what is provided in the text for enhancement.
  if you cannont enhance return nothing     `;
@@ -178,7 +194,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
         context: {
           stage: 'enhancement',
           ideaMetadata: {
-            department: formData.department,
+            department: formData.authorDept,
             tags: formData.tags
           }
         }
@@ -218,9 +234,29 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
     window.scrollTo(0, 0);
   };
 
+  // Function to save idea to MongoDB
+  const saveIdeaToMongoDB = async (ideaData) => {
+    try {
+      // POST request to the API endpoint for creating ideas
+      const response = await axios.post('http://localhost:3001/idea/create', ideaData);
+      
+      if (response.status === 200 || response.data === "success") {
+        return { success: true, data: response.data };
+      } else {
+        throw new Error('Failed to save idea to database');
+      }
+    } catch (error) {
+      console.error('Error saving idea to MongoDB:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || error.message || 'Unknown error occurred'
+      };
+    }
+  };
+
   const handleSaveDraft = async () => {
     // Validate at least the title
-    if (!formData.title.trim()) {
+    if (!formData.ideaName.trim()) {
       setErrors({ ...errors, title: 'Title is required to save a draft' });
       return;
     }
@@ -228,23 +264,41 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
     setLoading(true);
     
     try {
-      // Add the idea as a draft using the context function
-      const newIdea = await addIdea({
+      // Prepare data for MongoDB
+      const ideaData = {
         ...formData,
-        status: 'Draft'
-      });
+        status: 'Draft',
+        // Don't set dates - let the server handle this
+      };
       
-      // Show success message
-      setSnackbarMessage('Idea saved as draft successfully');
-      setSnackbarOpen(true);
+      // Save to MongoDB
+      const result = await apiService.createIdea(ideaData);
       
-      // Redirect to the ideas list
-      setTimeout(() => {
-        navigate('/ideas');
-      }, 1500);
+      if (result && (result._id || result.id)) {
+        // Show success message
+        setSnackbarMessage('Idea saved as draft successfully');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+        
+        // Also update local state using the AppContext function
+        addIdea({
+          ...formData,
+          ...result, // Include all fields from the server response
+          status: 'Draft'
+        });
+        
+        // Redirect to the ideas list
+        setTimeout(() => {
+          navigate('/ideas');
+        }, 1500);
+      } else {
+        throw new Error('Server did not return a valid idea ID');
+      }
     } catch (error) {
       // Handle errors
+      console.error('Error saving draft:', error);
       setSnackbarMessage('Error saving draft: ' + (error.message || 'Please try again'));
+      setSnackbarSeverity('error');
       setSnackbarOpen(true);
     } finally {
       setLoading(false);
@@ -256,23 +310,40 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
       setLoading(true);
       
       try {
-        // Add the idea with created status
-        const newIdea = await addIdea({
+        // Prepare data for MongoDB
+        const ideaData = {
           ...formData,
-          status: 'Created' // Status is "Created" but not yet submitted
-        });
+          status: 'created', // Status is "created" but not yet submitted
+        };
         
-        // Show success message
-        setSnackbarMessage('Idea created successfully');
-        setSnackbarOpen(true);
+        // Save to MongoDB
+        const result = await apiService.createIdea(ideaData);
         
-        // Redirect to the idea detail page
-        setTimeout(() => {
-          navigate(`/ideas/${newIdea.id}`);
-        }, 1500);
+        if (result && (result._id || result.id)) {
+          // Show success message
+          setSnackbarMessage('Idea created successfully');
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
+          
+          // Also update local state using the AppContext function
+          const newIdea = addIdea({
+            ...formData,
+            ...result, // Include all fields from the server response, including the _id
+            status: 'Created'
+          });
+          
+          // Redirect to the idea detail page using the MongoDB-generated _id
+          setTimeout(() => {
+            navigate(`/ideas/${result._id || result.id}`);
+          }, 1500);
+        } else {
+          throw new Error('Server did not return a valid idea ID');
+        }
       } catch (error) {
         // Handle errors
+        console.error('Error creating idea:', error);
         setSnackbarMessage('Error creating idea: ' + (error.message || 'Please try again'));
+        setSnackbarSeverity('error');
         setSnackbarOpen(true);
       } finally {
         setLoading(false);
@@ -302,7 +373,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                 fullWidth
                 label="Idea Title"
                 name="title"
-                value={formData.title}
+                value={formData.ideaName}
                 onChange={handleChange}
                 error={!!errors.title}
                 helperText={errors.title || "Give your idea a clear, descriptive title"}
@@ -352,7 +423,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                 fullWidth
                 label="Your Name"
                 name="submittedBy"
-                value={formData.submittedBy}
+                value={formData.authorName}
                 onChange={handleChange}
                 error={!!errors.submittedBy}
                 helperText={errors.submittedBy || "Enter your full name"}
@@ -373,7 +444,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                 <Select
                   labelId="department-label"
                   name="department"
-                  value={formData.department}
+                  value={formData.authorDept}
                   onChange={handleChange}
                   label="Department"
                   required
@@ -394,10 +465,11 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                   <MenuItem value="" disabled>
                     <em>Select your department</em>
                   </MenuItem>
-                  <MenuItem value="HR">Engineering</MenuItem>
-                  <MenuItem value="TECHNOLOGY">Marketing</MenuItem>
-                  <MenuItem value="FINANCE">Sales</MenuItem>
-                  <MenuItem value="LEGAL">Legal</MenuItem>
+                  {departments.map((dept) => (
+                    <MenuItem key={dept} value={dept}>
+                      {dept}
+                    </MenuItem>
+                  ))}
                 </Select>
                 {errors.department && (
                   <Typography variant="caption" color="error">
@@ -405,6 +477,19 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                   </Typography>
                 )}
               </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.public}
+                    onChange={(e) => setFormData({...formData, public: e.target.checked})}
+                    color="primary"
+                  />
+                }
+                label="Make this idea visible to everyone in the organization"
+              />
             </Grid>
           </Grid>
         </Paper>
@@ -466,7 +551,6 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
   const renderDetailsStep = () => {
     return (
       <Box>
-
         <Typography variant="h6" sx={{ mb: 3, color: 'primary.main', fontWeight: 600 }}>
           Step 2: Problem & Impact
         </Typography>
@@ -505,7 +589,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                 fullWidth
                 label="Target Audience"
                 name="targetAudience"
-                value={formData.targetAudience}
+                value={formData.audience}
                 onChange={handleChange}
                 placeholder="Who will benefit from this innovation?"
                 helperText="Specify which teams, customers, or stakeholders would benefit"
@@ -555,7 +639,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                 fullWidth
                 label="Resources Needed"
                 name="resourcesNeeded"
-                value={formData.resourcesNeeded}
+                value={formData.resources}
                 onChange={handleChange}
                 multiline
                 rows={2}
@@ -743,7 +827,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
         <Card variant="outlined" sx={{ mb: 4 }}>
           <Box sx={{ p: 2, bgcolor: 'primary.light', borderTopLeftRadius: 8, borderTopRightRadius: 8 }}>
             <Typography variant="h6" color="white" fontWeight="600">
-              {formData.title || "Untitled Idea"}
+              {formData.ideaName || "Untitled Idea"}
             </Typography>
           </Box>
           <CardContent>
@@ -753,7 +837,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                   Created By
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  {formData.submittedBy} ({formData.department})
+                  {formData.authorName} ({formData.authorDept})
                 </Typography>
               </Grid>
               
@@ -801,7 +885,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                   Target Audience
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  {formData.targetAudience || "Not specified"}
+                  {formData.audience || "Not specified"}
                 </Typography>
               </Grid>
               
@@ -810,7 +894,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                   Resources Needed
                 </Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
-                  {formData.resourcesNeeded || "Not specified"}
+                  {formData.resources || "Not specified"}
                 </Typography>
               </Grid>
               
@@ -896,7 +980,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
                 variant="outlined"
                 onClick={handleSaveDraft}
                 startIcon={<SaveIcon />}
-                disabled={loading || !formData.title.trim()}
+                disabled={loading || !formData.ideaName.trim()}
                 sx={{ mr: 2 }}
               >
                 Save as Draft
@@ -933,6 +1017,7 @@ Please enhance this innovation idea to make it more compelling, impactful, and b
         autoHideDuration={3000}
         onClose={handleCloseSnackbar}
         message={snackbarMessage}
+        severity={snackbarSeverity}
       />
     </Box>
   );

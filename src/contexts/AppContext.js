@@ -1,99 +1,148 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { mockIdeas, departments, teams, statusOptions } from '../data/mockData';
+import { departments, teams, statusOptions } from '../data/mockData';
+import apiService from '../services/apiService';
 
 export const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Simulate loading data from an API
+  // Fetch ideas from the MongoDB database via API
   useEffect(() => {
-    const fetchData = async () => {
-      // Simulate API call with a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIdeas(mockIdeas);
-      setLoading(false);
-    };
-
-    fetchData();
-  }, []);
-
-  // Add a new idea
-  const addIdea = (idea) => {
-    const newIdea = {
-      ...idea,
-      id: ideas.length + 1,
-      dateSubmitted: new Date().toISOString().slice(0, 10),
-      status: idea.status || 'Created',
-      progress: 0,
-      comments: [],
-      jiraTickets: [],
-      aiScore: {
-        feasibility: 0,
-        impact: 0,
-        alignment: 0,
-        overall: 0
-      },
-      estimatedCost: {
-        development: 0,
-        implementation: 0,
-        maintenance: 0,
-        total: 0
+    const fetchIdeas = async () => {
+      try {
+        setLoading(true);
+        const fetchedIdeas = await apiService.getAllIdeas();
+        setIdeas(fetchedIdeas);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching ideas:', err);
+        setError('Failed to load ideas. Please try again later.');
+        // Fallback to mock data if API fails
+        // This helps during development if the server isn't running
+        setIdeas([]);
+      } finally {
+        setLoading(false);
       }
     };
-    setIdeas([...ideas, newIdea]);
-    return newIdea;
+
+    fetchIdeas();
+  }, []);
+
+  // Add a new idea via API
+  const addIdea = async (idea) => {
+    try {
+      setLoading(true);
+      
+      // Create idea in the database
+      const response = await apiService.createIdea(idea);
+      
+      // If successful, fetch the updated list of ideas
+      // Or, add the new idea to the state
+      const newIdea = {
+        ...idea,
+        id: ideas.length + 1, // This is temporary - the server will assign the real ID
+        createdAt: new Date(),
+        lastUpdated: new Date()
+      };
+      
+      setIdeas([...ideas, newIdea]);
+      setError(null);
+      return newIdea;
+    } catch (err) {
+      console.error('Error adding idea:', err);
+      setError('Failed to add idea. Please try again.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Update an idea
-  const updateIdea = (id, updatedData) => {
-    setIdeas(ideas.map(idea => 
-      idea.id === id ? { ...idea, ...updatedData } : idea
-    ));
+  // Update an idea via API
+  const updateIdea = async (id, updatedData) => {
+    try {
+      setLoading(true);
+      
+      // Update idea in the database
+      await apiService.updateIdea(id, updatedData);
+      
+      // Update the idea in the local state
+      setIdeas(ideas.map(idea => 
+        idea.id === id ? { ...idea, ...updatedData, lastUpdated: new Date() } : idea
+      ));
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error updating idea:', err);
+      setError('Failed to update idea. Please try again.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Evaluate an idea using "AI"
-  const evaluateIdea = (id) => {
-    const idea = ideas.find(idea => idea.id === id);
-    if (!idea) return null;
-
-    // Simulate AI evaluation
-    const generateRandomScore = () => Math.floor(Math.random() * 30) + 70; // Random score between 70-99
-    
-    const aiScore = {
-      feasibility: generateRandomScore(),
-      impact: generateRandomScore(),
-      alignment: generateRandomScore(),
-      overall: 0
-    };
-    
-    // Calculate overall score as average
-    aiScore.overall = Math.round((aiScore.feasibility + aiScore.impact + aiScore.alignment) / 3);
-    
-    // Assign team based on idea content and tags
-    const potentialTeams = [...teams];
-    const assignedTeam = potentialTeams[Math.floor(Math.random() * potentialTeams.length)];
-    
-    // Generate estimated costs
-    const estimatedCost = {
-      development: Math.round((Math.random() * 40000 + 10000) / 1000) * 1000, // $10k-$50k
-      implementation: Math.round((Math.random() * 15000 + 5000) / 1000) * 1000, // $5k-$20k
-      maintenance: Math.round((Math.random() * 20000 + 5000) / 1000) * 1000, // $5k-$25k
-      total: 0
-    };
-    estimatedCost.total = estimatedCost.development + estimatedCost.implementation + estimatedCost.maintenance;
-    
-    const updatedIdea = {
-      ...idea,
-      aiScore,
-      status: 'Evaluation',
-      assignedTeam,
-      estimatedCost
-    };
-    
-    updateIdea(id, updatedIdea);
-    return updatedIdea;
+  // Evaluate an idea with AI
+  const evaluateIdea = async (id) => {
+    try {
+      setLoading(true);
+      
+      // Get the idea to evaluate
+      const idea = ideas.find(idea => idea.id === id);
+      if (!idea) {
+        throw new Error('Idea not found');
+      }
+      
+      // Call the AI enhancement API
+      const enhancementResult = await apiService.enhanceIdeaWithAI(idea);
+      
+      // Generate scores from the enhancement
+      // In a real implementation, these would come from the AI
+      const generateRandomScore = () => Math.floor(Math.random() * 30) + 70; // Random score between 70-99
+      
+      const aiScore = {
+        innovationScore: generateRandomScore(),
+        impactScore: generateRandomScore(),
+        alignmentScore: generateRandomScore(),
+        feasibilityScore: generateRandomScore(),
+        overall: 0
+      };
+      
+      // Calculate overall score as average
+      aiScore.overall = Math.round(
+        (aiScore.innovationScore + aiScore.impactScore + aiScore.alignmentScore + aiScore.feasibilityScore) / 4
+      );
+      
+      // Assign team based on idea content and tags
+      const potentialTeams = [...teams];
+      const assignedTeam = potentialTeams[Math.floor(Math.random() * potentialTeams.length)];
+      
+      // Update the idea with AI evaluation results
+      const updatedIdea = {
+        ...idea,
+        innovationScore: aiScore.innovationScore,
+        impactScore: aiScore.impactScore,
+        alignmentScore: aiScore.alignmentScore,
+        feasibilityScore: aiScore.feasabilityScore,
+        status: 'evaluation',
+        jiraAssignedTeam: assignedTeam,
+        innovationExplanation: enhancementResult.rewritten || idea.description,
+        impactExplanation: enhancementResult.evaluation || "AI evaluation of impact"
+      };
+      
+      // Save the updated idea to the database
+      await updateIdea(id, updatedIdea);
+      
+      setError(null);
+      return updatedIdea;
+    } catch (err) {
+      console.error('Error evaluating idea:', err);
+      setError('Failed to evaluate idea. Please try again.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Create Jira tickets for an idea
@@ -124,16 +173,16 @@ export const AppProvider = ({ children }) => {
       
       jiraTickets.push({
         id: jiraId,
-        title: ticketType + " for " + idea.title,
+        title: ticketType + " for " + idea.ideaName,
         status: "Not Started",
-        assignee: idea.assignedTeam
+        assignee: idea.jiraAssignedTeam
       });
     }
     
     const updatedIdea = {
       ...idea,
       jiraTickets,
-      status: 'Approved',
+      status: 'approved',
       progress: 5 // Starting progress
     };
     
@@ -151,19 +200,21 @@ export const AppProvider = ({ children }) => {
     
     const departmentCounts = {};
     departments.forEach(dept => {
-      departmentCounts[dept] = ideas.filter(idea => idea.department === dept).length;
+      departmentCounts[dept] = ideas.filter(idea => idea.authorDept === dept || idea.department === dept).length;
     });
     
     // Calculate average scores
-    let avgFeasibility = 0;
+    let avgInnovation = 0;
     let avgImpact = 0;
     let avgAlignment = 0;
-    let scoredIdeas = ideas.filter(idea => idea.aiScore && idea.aiScore.overall > 0);
+    let avgFeasibility = 0;
+    let scoredIdeas = ideas.filter(idea => idea.innovationScore && idea.impactScore);
     
     if (scoredIdeas.length > 0) {
-      avgFeasibility = scoredIdeas.reduce((sum, idea) => sum + idea.aiScore.feasibility, 0) / scoredIdeas.length;
-      avgImpact = scoredIdeas.reduce((sum, idea) => sum + idea.aiScore.impact, 0) / scoredIdeas.length;
-      avgAlignment = scoredIdeas.reduce((sum, idea) => sum + idea.aiScore.alignment, 0) / scoredIdeas.length;
+      avgInnovation = scoredIdeas.reduce((sum, idea) => sum + idea.innovationScore, 0) / scoredIdeas.length;
+      avgImpact = scoredIdeas.reduce((sum, idea) => sum + idea.impactScore, 0) / scoredIdeas.length;
+      avgAlignment = scoredIdeas.reduce((sum, idea) => sum + idea.alignmentScore, 0) / scoredIdeas.length;
+      avgFeasibility = scoredIdeas.reduce((sum, idea) => sum + idea.feasabilityScore, 0) / scoredIdeas.length;
     }
     
     return {
@@ -171,12 +222,18 @@ export const AppProvider = ({ children }) => {
       statusCounts,
       departmentCounts,
       avgScores: {
-        feasibility: Math.round(avgFeasibility),
+        innovation: Math.round(avgInnovation),
         impact: Math.round(avgImpact),
         alignment: Math.round(avgAlignment),
-        overall: Math.round((avgFeasibility + avgImpact + avgAlignment) / 3)
+        feasibility: Math.round(avgFeasibility),
+        overall: Math.round((avgInnovation + avgImpact + avgAlignment + avgFeasibility) / 4)
       }
     };
+  };
+
+  // Error handling function
+  const clearError = () => {
+    setError(null);
   };
 
   return (
@@ -184,6 +241,7 @@ export const AppProvider = ({ children }) => {
       value={{
         ideas,
         loading,
+        error,
         departments,
         teams,
         statusOptions,
@@ -191,7 +249,8 @@ export const AppProvider = ({ children }) => {
         updateIdea,
         evaluateIdea,
         createJiraTickets,
-        getStats
+        getStats,
+        clearError
       }}
     >
       {children}

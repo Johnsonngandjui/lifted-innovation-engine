@@ -368,26 +368,40 @@ app.get('/idea/:ideaId', async (req, res) => {
 });
 
 //post create new idea
+//post create new idea
 app.post('/idea/create', async (req, res) => {
     try {
-        ideaModel.insertMany({
+        // Create a new idea document
+        const newIdea = new ideaModel({
             ideaName: req.body.ideaName,
             authorId: req.body.authorId, //n-num
             authorName: req.body.authorName,
             authorDept: req.body.authorDept,
-            public: req.body.public,
+            public: req.body.public || true, // Default to true if not provided
             createdAt: new Date(),
             lastUpdated: new Date(),
-            description: req.body.description, //subject to change
-            latestStage: "created",
-            initialAddlContext: req.body.initialContext, //subject to change, can hold stuff like target audience, resources needed etc
+            description: req.body.description,
+            status: req.body.status || "created", // Use status field instead of latestStage
+            problemStatement: req.body.problemStatement,
+            audience: req.body.audience,
+            expectedImpact: req.body.expectedImpact,
+            resources: req.body.resources,
             likes: 0,
-            parentIdeaId: req.body.parentIdeaId,
-            tags: req.body.tags
-        })
-        res.send("success");
+            parentIdeaId: req.body.parentIdeaId || "",
+            tags: req.body.tags || []
+        });
+        
+        // Save the new idea
+        const savedIdea = await newIdea.save();
+        
+        // Return the complete saved idea object with MongoDB-generated ID
+        res.status(201).json(savedIdea);
     } catch (error) { 
-        res.status(400).send({ message: 'Error creating idea', error });
+        console.error('Error creating idea:', error);
+        res.status(400).send({ 
+            message: 'Error creating idea', 
+            error: error.message || error 
+        });
     }
 });
 
